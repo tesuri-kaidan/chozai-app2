@@ -404,6 +404,33 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   </div>
 </div>
 
+<div class="modal-overlay hidden" id="numEditModal">
+  <div class="modal">
+    <h3>🔢 番号を変更</h3>
+    <div class="modal-sub" id="numEditSub"></div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:0;margin:16px 0;">
+      <div class="num-spinner">
+        <button class="spinner-btn" onmousedown="startRepeatEdit(-1)" onmouseup="stopRepeat()" onmouseleave="stopRepeat()" ontouchstart="startRepeatEdit(-1);return false;" ontouchend="stopRepeat()">−</button>
+        <div class="sdiv"></div>
+        <input type="number" class="ticket-input" id="numEditInput" min="1" max="999" value="1" style="font-size:32px;width:90px;">
+        <div class="sdiv"></div>
+        <button class="spinner-btn" onmousedown="startRepeatEdit(1)" onmouseup="stopRepeat()" onmouseleave="stopRepeat()" ontouchstart="startRepeatEdit(1);return false;" ontouchend="stopRepeat()">＋</button>
+      </div>
+    </div>
+    <button class="btn-save-modal" onclick="confirmNumEdit()">変更する</button>
+    <button class="modal-cancel-btn" onclick="closeNumEditModal()">キャンセル</button>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="numSwapModal">
+  <div class="modal">
+    <h3>🔄 番号が使用中です</h3>
+    <div class="modal-sub" id="numSwapSub"></div>
+    <button class="btn-save-modal" onclick="confirmSwap()" style="margin-top:8px">交換する</button>
+    <button class="modal-cancel-btn" onclick="closeSwapModal()">キャンセル</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Firebase SDKs (compat版 = window.firebase に公開される) -->
@@ -476,6 +503,71 @@ function setNextUnusedNum(){
   var n=1;
   while(used.has(String(n))&&n<999)n++;
   document.getElementById('ticketNumInput').value=n;
+}
+
+var numEditTargetId=null, swapTargetId=null, swapNewNum=null, swapConflictId=null;
+
+function openNumEditModal(id){
+  var t=allT[id];if(!t)return;
+  numEditTargetId=id;
+  document.getElementById('numEditSub').textContent='No.'+t.ticketNum+' の番号を変更します';
+  document.getElementById('numEditInput').value=t.ticketNum;
+  document.getElementById('numEditModal').classList.remove('hidden');
+}
+function closeNumEditModal(){
+  document.getElementById('numEditModal').classList.add('hidden');
+  numEditTargetId=null;
+}
+function startRepeatEdit(d){
+  var e=document.getElementById('numEditInput');
+  e.value=Math.max(1,Math.min(999,(parseInt(e.value)||1)+d));
+  repT=setTimeout(function(){repI=setInterval(function(){e.value=Math.max(1,Math.min(999,(parseInt(e.value)||1)+d));},80);},380);
+}
+function confirmNumEdit(){
+  var t=allT[numEditTargetId];if(!t)return;
+  var newNum=String(document.getElementById('numEditInput').value).trim();
+  if(!newNum||newNum===t.ticketNum){closeNumEditModal();return;}
+  // 同じ番号かチェック
+  if(newNum===t.ticketNum){closeNumEditModal();return;}
+  // 使用中かチェック
+  var conflict=null;
+  Object.values(allT).forEach(function(other){
+    if(other.id!==numEditTargetId&&other.ticketNum===newNum&&['active','paused','giqi'].indexOf(other.status)>=0){
+      conflict=other;
+    }
+  });
+  if(conflict){
+    // 交換モーダルへ
+    swapTargetId=numEditTargetId;
+    swapNewNum=newNum;
+    swapConflictId=conflict.id;
+    document.getElementById('numSwapSub').textContent=
+      'No.'+newNum+' はすでに計測中です。\nNo.'+t.ticketNum+' ↔ No.'+newNum+' を交換しますか？';
+    closeNumEditModal();
+    document.getElementById('numSwapModal').classList.remove('hidden');
+  } else {
+    // 単純に変更
+    t.ticketNum=newNum;
+    pushT(t);
+    closeNumEditModal();
+    renderAll();
+    showToast('No.'+newNum+' に変更しました');
+  }
+}
+function confirmSwap(){
+  var t1=allT[swapTargetId],t2=allT[swapConflictId];
+  if(!t1||!t2){closeSwapModal();return;}
+  var tmp=t1.ticketNum;
+  t1.ticketNum=t2.ticketNum;
+  t2.ticketNum=tmp;
+  pushT(t1);pushT(t2);
+  closeSwapModal();
+  renderAll();
+  showToast('No.'+t1.ticketNum+' ↔ No.'+t2.ticketNum+' を交換しました');
+}
+function closeSwapModal(){
+  document.getElementById('numSwapModal').classList.add('hidden');
+  swapTargetId=null;swapNewNum=null;swapConflictId=null;
 }
 
 function cleanOldTickets(){
@@ -732,7 +824,8 @@ function renderCard(t,grid){
   else{cpHtml='<div class="current-process"><span class="proc-icon">❌</span><span class="proc-name" style="color:var(--muted)">キャンセル済み</span></div>';}
   var giqiHtml=(t.giqiCount||0)>0?'<div class="giqi-info">📞 疑義照会 <span>'+t.giqiCount+'回</span>　計 <span>'+fmt(t.giqiTotalMs||0)+'</span>'+(t.status==='giqi'?' ⏱進行中':'')+'</div>':'';
   var pauseHtml=(t.pauseCount||0)>0?'<div class="sub-info">⏸ 一時停止 '+t.pauseCount+'回</div>':'';
-  card.innerHTML='<div class="ticket-header"><div class="ticket-num">No.'+t.ticketNum+'</div><span class="ticket-badge badge-'+sc+'">'+bl+'</span></div>'+tagsHtml+hFlagHtml+'<div class="steps">'+stepsHtml+'</div>'+cpHtml+'<div class="total-time" id="total-'+t.id+'">合計: <span>'+fmt(totalElapsed(t))+'</span></div>'+giqiHtml+pauseHtml+'<div class="ticket-buttons" id="btns-'+t.id+'"></div>';
+  var canEditNum=['active','paused','giqi'].indexOf(t.status)>=0;
+  card.innerHTML='<div class="ticket-header"><div class="ticket-num"'+(canEditNum?' onclick="openNumEditModal(\''+t.id+'\')" style="cursor:pointer;text-decoration:underline dotted;" title="番号を変更"':'')+'>No.'+t.ticketNum+'</div><span class="ticket-badge badge-'+sc+'">'+bl+'</span></div>'+tagsHtml+hFlagHtml+'<div class="steps">'+stepsHtml+'</div>'+cpHtml+'<div class="total-time" id="total-'+t.id+'">合計: <span>'+fmt(totalElapsed(t))+'</span></div>'+giqiHtml+pauseHtml+'<div class="ticket-buttons" id="btns-'+t.id+'"></div>';
 
   // ボタンをJSで直接生成してイベントリスナーをアタッチ
   var btnWrap=card.querySelector('#btns-'+t.id);

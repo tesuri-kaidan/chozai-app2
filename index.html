@@ -37,6 +37,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .header-left{display:flex;align-items:center;gap:10px;}
 .store-badge{background:var(--accent-soft);border:1.5px solid var(--accent);border-radius:8px;padding:4px 10px;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--accent);cursor:pointer;user-select:none;}
 .store-badge:hover{background:#d4e0ff;}
+.refresh-btn{background:var(--danger-soft);border:1.5px solid var(--danger);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--danger);cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap;}
+.refresh-btn:hover{background:#ffd0d4;}
 .header-title{font-size:16px;font-weight:900;}
 .header-right{display:flex;align-items:center;gap:12px;}
 .sync-wrap{display:flex;align-items:center;gap:5px;}
@@ -249,10 +251,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   <header>
     <div class="header-left">
       <div class="store-badge" onclick="changeStore()">🏪 <span id="storeLabel">-----</span></div>
+      <button class="refresh-btn" onclick="refreshTickets()" title="古いデータを削除">🗑 今日以外を削除</button>
       <div class="header-title">調剤ボトルネック分析</div>
     </div>
     <div class="header-right">
-      <div class="sync-wrap"><div class="sync-dot" id="syncDot"></div><span class="sync-label" id="syncLabel">--</span></div>
+      <button onclick="cleanOldTickets()" style="padding:5px 11px;background:var(--danger-soft);color:var(--danger);border:1px solid rgba(217,0,25,0.25);border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">🗑 古い番号を消す</button><div class="sync-wrap"><div class="sync-dot" id="syncDot"></div><span class="sync-label" id="syncLabel">--</span></div>
       <div class="clock" id="clockDisplay"></div>
     </div>
   </header>
@@ -441,6 +444,22 @@ function confirmStore(){
   if(code.length!==5){var h=document.getElementById('setupHint');h.textContent='⚠ 5桁の数字を入力してください';h.className='setup-hint err';document.getElementById('storeCodeInput').focus();return;}
   SC=code;localStorage.setItem('rx_store_code',code);launchApp();
 }
+function refreshTickets(){
+  if(!confirm('今日（'+todayStr+'）以外のチケットをFirebaseから全削除しますか？\nキャンセル済み・古い日付のデータが消えます。'))return;
+  fRef('tickets').once('value',function(snap){
+    var raw=snap.val()||{};
+    var count=0;
+    Object.keys(raw).forEach(function(k){
+      if(!raw[k].dateStr||raw[k].dateStr!==todayStr){
+        fRef('tickets/'+k).remove();
+        delete allT[k];
+        count++;
+      }
+    });
+    renderAll();updateCountBadge();
+    showToast('🗑 '+count+'件の古いデータを削除しました');
+  });
+}
 function changeStore(){
   if(!confirm('店舗コードを変更しますか？'))return;
   if(unsub1)unsub1();if(unsub2)unsub2();if(unsub3)unsub3();
@@ -452,6 +471,20 @@ function changeStore(){
   document.getElementById('setupHint').textContent='例：本店 → 00001　／　北口店 → 00002';
   document.getElementById('setupHint').className='setup-hint';
 }
+function cleanOldTickets(){
+  var count=0;
+  Object.keys(allT).forEach(function(k){
+    var t=allT[k];
+    if(!t.dateStr||t.dateStr!==todayStr){
+      fRef('tickets/'+k).remove();
+      delete allT[k];
+      count++;
+    }
+  });
+  if(count>0){renderAll();updateCountBadge();showToast('🗑 '+count+'件の古い番号を削除しました');}
+  else{showToast('古い番号はありません');}
+}
+
 function launchApp(){
   document.getElementById('setupScreen').style.display='none';
   document.getElementById('mainApp').style.display='block';

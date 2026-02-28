@@ -471,6 +471,13 @@ function changeStore(){
   document.getElementById('setupHint').textContent='例：本店 → 00001　／　北口店 → 00002';
   document.getElementById('setupHint').className='setup-hint';
 }
+function setNextUnusedNum(){
+  var used=usedToday();
+  var n=1;
+  while(used.has(String(n))&&n<999)n++;
+  document.getElementById('ticketNumInput').value=n;
+}
+
 function cleanOldTickets(){
   var count=0;
   Object.keys(allT).forEach(function(k){
@@ -511,7 +518,7 @@ function startListening(){
     });
     toDelete.forEach(function(k){fRef('tickets/'+k).remove();});
     allT=raw;
-    syncDot('synced');renderAll();updateCountBadge();
+    syncDot('synced');renderAll();updateCountBadge();setNextUnusedNum();
     if(Object.values(allT).some(function(t){return['active','giqi'].indexOf(t.status)>=0;})&&!tickInt){
       tickInt=setInterval(renderTimers,500);
     }
@@ -598,8 +605,7 @@ function addTicket(){
   var id='T'+Date.now(),now=Date.now();
   var t={id:id,ticketNum:num,status:'active',currentStep:0,stepTimes:{},pauseCount:0,giqiCount:0,giqiTotalMs:0,giqiStart:null,tags:tags,stepStart:now,pauseStart:null,pauseAccum:0,totalStart:now,dateStr:todayStr};
   allT[id]=t;pushT(t);
-  var next=parseInt(num)+1;var used=usedToday();while(used.has(String(next))&&next<999)next++;
-  numEl.value=Math.min(999,next);
+  setNextUnusedNum();
   var em=document.getElementById('emptyState');if(em)em.remove();
   renderAll();updateCountBadge();
   if(!tickInt)tickInt=setInterval(renderTimers,500);

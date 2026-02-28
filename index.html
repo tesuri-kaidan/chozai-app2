@@ -466,11 +466,17 @@ function startListening(){
   syncDot('syncing');
   unsub1=fRef('tickets').on('value',function(snap){
     var raw=snap.val()||{};
-    // stepTimesがnullの場合に空オブジェクトに変換
+    var toDelete=[];
     Object.keys(raw).forEach(function(k){
       if(!raw[k].stepTimes)raw[k].stepTimes={};
       if(!raw[k].tags)raw[k].tags=[];
+      // 別の日付のチケットは自動削除
+      if(raw[k].dateStr && raw[k].dateStr!==todayStr){
+        toDelete.push(k);
+        delete raw[k];
+      }
     });
+    toDelete.forEach(function(k){fRef('tickets/'+k).remove();});
     allT=raw;
     syncDot('synced');renderAll();updateCountBadge();
     if(Object.values(allT).some(function(t){return['active','giqi'].indexOf(t.status)>=0;})&&!tickInt){
@@ -540,8 +546,13 @@ function updateCountBadge(){
   document.getElementById('ticketCountBadge').textContent=n+' / 30件';
 }
 function usedToday(){
+  // active/paused/giqi/cancelled すべて同日の番号は使用済みとする
   var s=new Set();
-  Object.values(allT).forEach(function(t){if(t.dateStr===todayStr&&['active','paused','giqi'].indexOf(t.status)>=0)s.add(t.ticketNum);});
+  Object.values(allT).forEach(function(t){
+    if(t.dateStr===todayStr&&['active','paused','giqi','cancelled'].indexOf(t.status)>=0)s.add(t.ticketNum);
+  });
+  // historyにある本日完了分も含める
+  histC.forEach(function(h){if(h.dateISO===todayStr)s.add(h.ticketNum);});
   return s;
 }
 function addTicket(){
@@ -549,7 +560,7 @@ function addTicket(){
   if(!num)return;
   var activeCount=Object.values(allT).filter(function(t){return['active','paused','giqi'].indexOf(t.status)>=0;}).length;
   if(activeCount>=30){showToast('⚠ 同時計測は30件までです');return;}
-  if(usedToday().has(num)){showToast('⚠ 番号 '+num+' は本日すでに使用中です');return;}
+  if(usedToday().has(num)){showToast('⚠ 番号 '+num+' は本日すでに使用済みです（キャンセル済みも含む）');return;}
   var tags=newTags.length>0?newTags.slice():['normal'];
   var id='T'+Date.now(),now=Date.now();
   var t={id:id,ticketNum:num,status:'active',currentStep:0,stepTimes:{},pauseCount:0,giqiCount:0,giqiTotalMs:0,giqiStart:null,tags:tags,stepStart:now,pauseStart:null,pauseAccum:0,totalStart:now,dateStr:todayStr};
@@ -632,6 +643,7 @@ function totalElapsed(t){return(t.totalEnd||t.cancelledAt||Date.now())-t.totalSt
 
 function renderAll(){
   var grid=document.getElementById('ticketsGrid'),cGrid=document.getElementById('cancelledGrid');
+  var savedScroll=grid.scrollTop;
   grid.querySelectorAll('.ticket-card').forEach(function(c){c.remove();});cGrid.innerHTML='';
   var emptyEl=document.getElementById('emptyState');
   var active=Object.values(allT).filter(function(t){return['active','paused','giqi'].indexOf(t.status)>=0;});
@@ -652,6 +664,8 @@ function renderAll(){
     cancelled.sort(function(a,b){return parseInt(a.ticketNum)-parseInt(b.ticketNum);});
     cancelled.forEach(function(t){renderCard(t,cGrid);});
   }else{document.getElementById('cancelledSection').style.display='none';}
+  // スクロール位置を復元（ボタン操作後に画面が上に飛ばないように）
+  grid.scrollTop=savedScroll;
 }
 
 function renderCard(t,grid){

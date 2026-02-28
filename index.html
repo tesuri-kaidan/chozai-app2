@@ -464,7 +464,19 @@ function launchApp(){
 // FIREBASE (compat SDK)
 function startListening(){
   syncDot('syncing');
-  unsub1=fRef('tickets').on('value',function(snap){allT=snap.val()||{};syncDot('synced');renderAll();updateCountBadge();},function(){syncDot('error');});
+  unsub1=fRef('tickets').on('value',function(snap){
+    var raw=snap.val()||{};
+    // stepTimesがnullの場合に空オブジェクトに変換
+    Object.keys(raw).forEach(function(k){
+      if(!raw[k].stepTimes)raw[k].stepTimes={};
+      if(!raw[k].tags)raw[k].tags=[];
+    });
+    allT=raw;
+    syncDot('synced');renderAll();updateCountBadge();
+    if(Object.values(allT).some(function(t){return['active','giqi'].indexOf(t.status)>=0;})&&!tickInt){
+      tickInt=setInterval(renderTimers,500);
+    }
+  },function(){syncDot('error');});
   unsub2=fRef('history').on('value',function(snap){var d=snap.val();histC=d?Object.values(d):[];updateHistory();updateAnalysis();populateTagFilters();});
   unsub3=fRef('hiyari').on('value',function(snap){var d=snap.val();hiyC=d?Object.values(d):[];updateHiyariTab();renderAll();});
 }
@@ -565,7 +577,7 @@ function toggleGiqi(id){
   else return;
   pushT(t);renderAll();updateCountBadge();
 }
-function resumeTicket(id){
+function resumeTicket_OLD(id){
   var t=allT[id];if(!t||t.status!=='paused')return;resumeId=id;
   var stepList=document.getElementById('resumeStepList');stepList.innerHTML='';
   PROC.forEach(function(p,i){
@@ -579,14 +591,25 @@ function resumeTicket(id){
   document.getElementById('resumeModalSub').textContent='No.'+t.ticketNum+' — どの工程から再開しますか？';
   document.getElementById('resumeModal').classList.remove('hidden');
 }
-function confirmResume(si){
+function confirmResume_OLD(si){
   var id=resumeId;if(!id)return;var t=allT[id],now=Date.now();
   PROC.forEach(function(_,i){if(i>=si)delete t.stepTimes[PROC[i].id];});
   t.currentStep=si;t.stepStart=now;t.pauseAccum=0;t.pauseStart=null;t.status='active';
   pushT(t);closeResumeModal();renderAll();updateCountBadge();
   if(!tickInt)tickInt=setInterval(renderTimers,500);
 }
-function closeResumeModal(){document.getElementById('resumeModal').classList.add('hidden');resumeId=null;}
+function closeResumeModal_OLD(){document.getElementById('resumeModal').classList.add('hidden');resumeId=null;}
+
+// シンプルな再開
+function resumeTicket(id){
+  var t=allT[id];if(!t||t.status!=='paused')return;
+  var now=Date.now();
+  if(t.pauseStart){t.pauseAccum=(t.pauseAccum||0)+(now-t.pauseStart);}
+  t.pauseStart=null;t.status='active';
+  pushT(t);renderAll();updateCountBadge();
+  if(!tickInt)tickInt=setInterval(renderTimers,500);
+}
+
 function cancelTicket(id){
   var t=allT[id];if(!t||['active','paused','giqi'].indexOf(t.status)<0)return;
   if(!confirm('No.'+t.ticketNum+' の計測をキャンセルしますか？'))return;

@@ -124,11 +124,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .sub-info{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:2px;}
 .ticket-buttons{margin-top:6px;}
 /* カード下部：左＝小ボタン群、右＝次の工程大ボタン */
-.card-action-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:stretch;margin-bottom:6px;}
-.card-side-btns{display:flex;flex-direction:column;gap:4px;min-width:72px;}
+.card-action-row{margin-bottom:6px;}
+.card-side-btns{display:flex;flex-direction:column;gap:4px;}
+.card-main-btns{display:grid;grid-template-columns:1fr 2fr;gap:6px;align-items:stretch;margin-top:6px;}
+.card-sub-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;}
 .tbtn{padding:7px 6px;border-radius:8px;border:none;cursor:pointer;font-size:11px;font-weight:700;font-family:'Noto Sans JP',sans-serif;transition:all 0.13s;touch-action:manipulation;white-space:nowrap;line-height:1.3;}
 /* 次の工程：右側に大きく */
-.tbtn-next{background:var(--accent);color:#fff;padding:0 18px;font-size:15px;border-radius:10px;box-shadow:0 3px 10px rgba(26,92,255,0.25);height:100%;min-height:80px;display:flex;align-items:center;justify-content:center;}
+.tbtn-next{background:var(--accent);color:#fff;padding:14px 10px;font-size:15px;border-radius:10px;box-shadow:0 3px 10px rgba(26,92,255,0.25);width:100%;}
 .tbtn-next:hover{filter:brightness(1.1);}
 /* 左側小ボタン群 */
 .tbtn-pause{background:var(--pause-soft);color:var(--pause);border:1px solid rgba(184,112,0,0.22);width:100%;font-size:11px;}
@@ -139,7 +141,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 .tbtn-cancel{background:transparent;color:var(--muted);border:1px solid var(--border);font-size:10px;padding:4px 8px;border-radius:6px;width:100%;}
 .tbtn-cancel:hover{color:var(--danger);border-color:var(--danger);}
 /* 再開・疑義中 */
-.tbtn-resume{background:var(--accent);color:#fff;padding:0 18px;font-size:14px;border-radius:10px;box-shadow:0 3px 10px rgba(26,92,255,0.25);height:100%;min-height:80px;display:flex;align-items:center;justify-content:center;}
+.tbtn-resume{background:var(--accent);color:#fff;padding:14px 10px;font-size:14px;border-radius:10px;box-shadow:0 3px 10px rgba(26,92,255,0.25);width:100%;}
 .tbtn-restore{background:var(--success);color:#fff;width:100%;padding:11px;border-radius:10px;}
 .tbtn-restore:hover{filter:brightness(1.1);}
 .empty-state{text-align:center;padding:48px 20px;color:var(--muted);}
@@ -952,12 +954,10 @@ function renderCard(t,grid){
   var giqiHtml=(t.giqiCount||0)>0?'<div class="giqi-info">📞 疑義照会 <span>'+t.giqiCount+'回</span>　計 <span>'+fmt(t.giqiTotalMs||0)+'</span>'+(t.status==='giqi'?' ⏱進行中':'')+'</div>':'';
   var pauseHtml=(t.pauseCount||0)>0?'<div class="sub-info">⏸ 一時停止 '+t.pauseCount+'回</div>':'';
   var canEditNum=['active','paused','giqi'].indexOf(t.status)>=0;
-  card.innerHTML='<div class="ticket-header"><div class="ticket-num"'+(canEditNum?' onclick="openNumEditModal(\''+t.id+'\')" style="cursor:pointer;text-decoration:underline dotted;" title="番号を変更"':'')+'>No.'+t.ticketNum+'</div><span class="ticket-badge badge-'+sc+'">'+bl+'</span></div>'+tagsHtml+hFlagHtml+'<div class="steps">'+stepsHtml+'</div>'+'<div class="card-action-row" id="action-row-'+t.id+'">'+cpHtml+'<div class="card-side-btns" id="side-btns-'+t.id+'"></div></div>'+'<div class="total-time" id="total-'+t.id+'">合計: <span>'+fmt(totalElapsed(t))+'</span></div>'+giqiHtml+pauseHtml+'<div class="ticket-buttons" id="btns-'+t.id+'"></div>'
+  card.innerHTML='<div class="ticket-header"><div class="ticket-num"'+(canEditNum?' onclick="openNumEditModal(\''+t.id+'\')" style="cursor:pointer;text-decoration:underline dotted;" title="番号を変更"':'')+'>No.'+t.ticketNum+'</div><span class="ticket-badge badge-'+sc+'">'+bl+'</span></div>'+tagsHtml+hFlagHtml+'<div class="steps">'+stepsHtml+'</div>'+cpHtml+'<div class="total-time" id="total-'+t.id+'">合計: <span>'+fmt(totalElapsed(t))+'</span></div>'+giqiHtml+pauseHtml+'<div class="ticket-buttons" id="btns-'+t.id+'"></div>'
 
   // ボタンをJSで直接生成してイベントリスナーをアタッチ
   var btnWrap=card.querySelector('#btns-'+t.id);
-  var sideBtns=card.querySelector('#side-btns-'+t.id);
-  var actionRow=card.querySelector('#action-row-'+t.id);
   var tid=t.id;
   function mkBtn(cls,label,fn,target){
     var b=document.createElement('button');
@@ -968,29 +968,35 @@ function renderCard(t,grid){
   }
   if(t.status==='active'){
     var isLast=t.currentStep>=PROC.length-1;
-    // 左列：小ボタン（一時停止・疑義照会・ヒヤリ）
-    mkBtn('tbtn-pause','⏸ 一時停止',function(){pauseTicket(tid);},sideBtns);
-    mkBtn('tbtn-giqi','📞 疑義照会',function(){toggleGiqi(tid);},sideBtns);
-    mkBtn('tbtn-hiyari','⚠ ヒヤリ',function(){openHiyariPickModal(tid);},sideBtns);
-    mkBtn('tbtn-cancel','キャンセル',function(){cancelTicket(tid);},sideBtns);
-    // 右列：次の工程大ボタン
-    mkBtn('tbtn-next',isLast?'✅ 投薬完了':'次の工程へ ▶',function(){completeStep(tid);});
+    // 上段：疑義照会・ヒヤリ（横並び・小）
+    var subRow=document.createElement('div');
+    subRow.style.cssText='display:flex;gap:4px;margin-bottom:6px;';
+    btnWrap.appendChild(subRow);
+    mkBtn('tbtn-giqi','📞 疑義照会',function(){toggleGiqi(tid);},subRow);
+    mkBtn('tbtn-hiyari','⚠ ヒヤリ',function(){openHiyariPickModal(tid);},subRow);
+    mkBtn('tbtn-cancel','キャンセル',function(){cancelTicket(tid);},subRow);
+    // 下段：左=一時停止(小)、右=次の工程(大)
+    var mainRow=document.createElement('div');
+    mainRow.style.cssText='display:grid;grid-template-columns:1fr 2fr;gap:6px;';
+    btnWrap.appendChild(mainRow);
+    mkBtn('tbtn-pause','⏸ 一時停止',function(){pauseTicket(tid);},mainRow);
+    mkBtn('tbtn-next',isLast?'✅ 投薬完了':'次の工程へ ▶',function(){completeStep(tid);},mainRow);
   }else if(t.status==='giqi'){
-    mkBtn('tbtn-hiyari','⚠ ヒヤリ',function(){openHiyariPickModal(tid);},sideBtns);
-    mkBtn('tbtn-cancel','キャンセル',function(){cancelTicket(tid);},sideBtns);
+    var subRow=document.createElement('div');
+    subRow.style.cssText='display:flex;gap:4px;margin-bottom:6px;';
+    btnWrap.appendChild(subRow);
+    mkBtn('tbtn-hiyari','⚠ ヒヤリ',function(){openHiyariPickModal(tid);},subRow);
+    mkBtn('tbtn-cancel','キャンセル',function(){cancelTicket(tid);},subRow);
     mkBtn('tbtn-giqi on','📞 疑義照会終了',function(){toggleGiqi(tid);});
   }else if(t.status==='paused'){
-    mkBtn('tbtn-hiyari','⚠ ヒヤリ',function(){openHiyariPickModal(tid);},sideBtns);
-    mkBtn('tbtn-cancel','キャンセル',function(){cancelTicket(tid);},sideBtns);
+    var subRow=document.createElement('div');
+    subRow.style.cssText='display:flex;gap:4px;margin-bottom:6px;';
+    btnWrap.appendChild(subRow);
+    mkBtn('tbtn-hiyari','⚠ ヒヤリ',function(){openHiyariPickModal(tid);},subRow);
+    mkBtn('tbtn-cancel','キャンセル',function(){cancelTicket(tid);},subRow);
     mkBtn('tbtn-resume','▶ 再開する',function(){resumeTicket(tid);});
   }else if(t.status==='cancelled'){
-    if(actionRow)actionRow.style.display='none';
     mkBtn('tbtn-restore','🔄 キャンセルを取り消して再開する',function(){restoreTicket(tid);});
-  }else{
-    if(actionRow)actionRow.style.display='none';
-  }
-  if(!sideBtns||!sideBtns.children.length){
-    if(actionRow)actionRow.style.gridTemplateColumns='1fr';
   }
   grid.appendChild(card);
   if(['active','giqi'].indexOf(t.status)>=0)updTimer(t.id);

@@ -1018,25 +1018,34 @@ function exportAnalysisCSV(){
   if(!done.length){showToast('出力するデータがありません');return;}
   var avgs={},cnts={};
   PROC.forEach(function(p){avgs[p.id]=0;cnts[p.id]=0;});
-  done.forEach(function(h){PROC.forEach(function(p){if(h.stepTimes&&h.stepTimes[p.id]){avgs[p.id]+=h.stepTimes[p.id];cnts[p.id]++;}});});
+  done.forEach(function(h){
+    PROC.forEach(function(p){
+      if(h.stepTimes&&h.stepTimes[p.id]){avgs[p.id]+=h.stepTimes[p.id];cnts[p.id]++;}
+    });
+  });
   PROC.forEach(function(p){avgs[p.id]=cnts[p.id]?avgs[p.id]/cnts[p.id]:0;});
-  var headers=['集計期間','完了件数','平均合計(秒)'].concat(PROC.map(function(p){return p.name+'平均(秒)';})).concat(['疑義照会率','疑義照会平均(秒)','BN工程']);
-  var from=document.getElementById('filterFrom').value||done[done.length-1].dateISO;
-  var to=document.getElementById('filterTo').value||done[0].dateISO;
+  var headers=['集計期間','完了件数','平均合計(秒)']
+    .concat(PROC.map(function(p){return p.name+'平均(秒)';})).concat(['疑義照会率','疑義照会平均(秒)','BN工程']);
+  var from=document.getElementById('filterFrom').value||(done.length?done[done.length-1].dateISO:'');
+  var to=document.getElementById('filterTo').value||(done.length?done[0].dateISO:'');
   var gD=done.filter(function(h){return(h.giqiCount||0)>0;});
   var avgTotal=done.reduce(function(a,h){return a+(h.total||0);},0)/done.length;
   var avgGiqi=gD.length?gD.reduce(function(a,h){return a+(h.giqiTotalMs||0);},0)/gD.length:0;
-  var bnId=Object.entries(avgs).sort(function(a,b){return b[1]-a[1];})[0][0];
-  var bnName=(PROC.find(function(p){return p.id===bnId;})||{}).name||'-';
-  var row=[from+'〜'+to, done.length, (avgTotal/1000).toFixed(1)]
+  var bnEntry=Object.entries(avgs).sort(function(a,b){return b[1]-a[1];})[0];
+  var bnName=bnEntry?(PROC.find(function(p){return p.id===bnEntry[0];})||{}).name||'-':'-';
+  var row=[from+'~'+to,done.length,(avgTotal/1000).toFixed(1)]
     .concat(PROC.map(function(p){return (avgs[p.id]/1000).toFixed(1);}))
-    .concat([Math.round(gD.length/done.length*100)+'%',(avgGiqi/1000).toFixed(1),bnName]);
-  var csv='﻿'+[headers,row].map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('
-');
-  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download='分析_'+SC+'_'+getToday()+'.csv';a.click();URL.revokeObjectURL(a.href);
-  showToast('✓ 分析CSVを出力しました');
+    .concat([Math.round((gD.length/done.length)*100)+'%',(avgGiqi/1000).toFixed(1),bnName]);
+  function q(v){return '"'+String(v).replace(/"/g,'""')+'"';}
+  var lines=[headers.map(q).join(','),row.map(q).join(',')];
+  var csv='\uFEFF'+lines.join('\r\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='分析_'+SC+'_'+getToday()+'.csv';
+  a.click();URL.revokeObjectURL(a.href);
+  showToast('分析CSVを出力しました');
 }
+
 
 function exportCSV(){
   var history=getFiltered('histFilterFrom','histFilterTo','histFilterTag');

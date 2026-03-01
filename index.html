@@ -774,11 +774,14 @@ function updateCountBadge(){
   document.getElementById('ticketCountBadge').textContent=n+'件 計測中';
 }
 function usedToday(){
-  // 計測中（active/paused/giqi）の番号のみ使用済みとする
-  // 完了・キャンセルは再利用可能
+  // 本日使った番号はすべて使用済み（計測中・完了・キャンセル全部）
   var s=new Set();
   Object.values(allT).forEach(function(t){
-    if(t.dateStr===todayStr&&['active','paused','giqi'].indexOf(t.status)>=0)s.add(t.ticketNum);
+    if(t.dateStr===todayStr)s.add(t.ticketNum);
+  });
+  // 履歴にある本日完了分も含める（allTから消えたもの）
+  histC.forEach(function(h){
+    if(h.dateISO===todayStr)s.add(h.ticketNum);
   });
   return s;
 }

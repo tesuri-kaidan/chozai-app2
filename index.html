@@ -265,6 +265,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 
   <div class="tabs">
     <button class="tab active" onclick="switchTab('measure')">⏱ 計測</button>
+    <button class="tab" onclick="switchTab('today')">📅 本日</button>
     <button class="tab" onclick="switchTab('analysis')">📊 分析</button>
     <button class="tab" onclick="switchTab('history')">📋 履歴</button>
     <button class="tab" onclick="switchTab('hiyari')">⚠ ヒヤリ</button>
@@ -281,7 +282,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
         <button class="spinner-btn" onmousedown="startRepeat(1)" onmouseup="stopRepeat()" onmouseleave="stopRepeat()" ontouchstart="startRepeat(1);return false;" ontouchend="stopRepeat()">＋</button>
       </div>
       <button class="btn-add" onclick="addTicket()">▶ 計測開始</button>
-      <span class="ticket-count-badge" id="ticketCountBadge">0 / 30件</span>
+      <span class="ticket-count-badge" id="ticketCountBadge">0件 計測中</span>
       <div class="tags-row">
         <label>タグ</label>
         <div id="newTagChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
@@ -290,10 +291,15 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
     <div class="tickets-grid" id="ticketsGrid">
       <div class="empty-state" id="emptyState"><div class="icon">🏥</div><p>呼び出し番号を入力して計測を開始してください</p></div>
     </div>
-    <div id="cancelledSection" style="display:none;" class="cancelled-section">
-      <div class="cancelled-header">▼ キャンセル済み（本日分・復活可能）</div>
-      <div class="tickets-grid" id="cancelledGrid"></div>
+    <!-- キャンセル済みは本日タブへ移動 -->
+  </div>
+
+  <div id="tab-today" class="tab-content">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow);">
+      <div id="todayStats" style="display:flex;gap:12px;flex-wrap:wrap;"></div>
     </div>
+    <div id="todayGrid" class="tickets-grid"></div>
+    <div id="todayEmpty" class="empty-state" style="display:none;"><div class="icon">📅</div><p>本日の完了・キャンセル番号はありません</p></div>
   </div>
 
   <div id="tab-analysis" class="tab-content">
@@ -630,7 +636,7 @@ function startListening(){
     });
     toDelete.forEach(function(k){fRef('tickets/'+k).remove();});
     allT=raw;
-    syncDot('synced');renderAll();updateCountBadge();setNextUnusedNum();
+    syncDot('synced');renderAll();updateCountBadge();setNextUnusedNum();if(document.getElementById('tab-today').classList.contains('active'))updateTodayTab();
     if(Object.values(allT).some(function(t){return['active','giqi'].indexOf(t.status)>=0;})&&!tickInt){
       tickInt=setInterval(renderTimers,500);
     }
@@ -695,7 +701,7 @@ function closeTagModal(){document.getElementById('tagModal').classList.add('hidd
 // TICKETS
 function updateCountBadge(){
   var n=Object.values(allT).filter(function(t){return['active','paused','giqi'].indexOf(t.status)>=0;}).length;
-  document.getElementById('ticketCountBadge').textContent=n+' / 30件';
+  document.getElementById('ticketCountBadge').textContent=n+'件 計測中';
 }
 function usedToday(){
   // active/paused/giqi/cancelled すべて同日の番号は使用済みとする
@@ -710,8 +716,7 @@ function usedToday(){
 function addTicket(){
   var numEl=document.getElementById('ticketNumInput'),num=numEl.value.trim();
   if(!num)return;
-  var activeCount=Object.values(allT).filter(function(t){return['active','paused','giqi'].indexOf(t.status)>=0;}).length;
-  if(activeCount>=30){showToast('⚠ 同時計測は30件までです');return;}
+
   if(usedToday().has(num)){showToast('⚠ 番号 '+num+' は本日すでに使用済みです（キャンセル済みも含む）');return;}
   var tags=newTags.length>0?newTags.slice():['normal'];
   var id='T'+Date.now(),now=Date.now();
@@ -793,13 +798,13 @@ function stepElapsed(t){
 function totalElapsed(t){return(t.totalEnd||t.cancelledAt||Date.now())-t.totalStart;}
 
 function renderAll(){
-  var grid=document.getElementById('ticketsGrid'),cGrid=document.getElementById('cancelledGrid');
+  var grid=document.getElementById('ticketsGrid');
   var savedScroll=grid.scrollTop;
-  grid.querySelectorAll('.ticket-card').forEach(function(c){c.remove();});cGrid.innerHTML='';
+  grid.querySelectorAll('.ticket-card').forEach(function(c){c.remove();});
   var emptyEl=document.getElementById('emptyState');
   var active=Object.values(allT).filter(function(t){return['active','paused','giqi'].indexOf(t.status)>=0;});
   var done=Object.values(allT).filter(function(t){return t.status==='done';});
-  var cancelled=Object.values(allT).filter(function(t){return t.status==='cancelled';});
+  // cancelled は本日タブで表示
   if(active.length+done.length===0){
     if(!emptyEl){var d=document.createElement('div');d.className='empty-state';d.id='emptyState';d.innerHTML='<div class="icon">🏥</div><p>呼び出し番号を入力して計測を開始してください</p>';grid.appendChild(d);}
     stopTicker();
@@ -810,13 +815,10 @@ function renderAll(){
     active.concat(done).forEach(function(t){renderCard(t,grid);});
     if(active.length===0)stopTicker();
   }
-  if(cancelled.length>0){
-    document.getElementById('cancelledSection').style.display='block';
-    cancelled.sort(function(a,b){return parseInt(a.ticketNum)-parseInt(b.ticketNum);});
-    cancelled.forEach(function(t){renderCard(t,cGrid);});
-  }else{document.getElementById('cancelledSection').style.display='none';}
-  // スクロール位置を復元（ボタン操作後に画面が上に飛ばないように）
+  // スクロール位置を復元
   grid.scrollTop=savedScroll;
+  // 本日タブが開いていれば更新
+  if(document.getElementById('tab-today').classList.contains('active'))updateTodayTab();
 }
 
 function renderCard(t,grid){
@@ -938,6 +940,125 @@ function exportCSV(){
   var csv='\uFEFF'+[headers].concat(rows).map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));a.download='調剤ボトルネック_'+SC+'_'+getToday()+'.csv';a.click();URL.revokeObjectURL(a.href);showToast('✓ CSV出力 '+rows.length+'件');
 }
+
+// TODAY TAB
+function updateTodayTab(){
+  var grid=document.getElementById('todayGrid');
+  var emptyEl=document.getElementById('todayEmpty');
+  grid.innerHTML='';
+
+  // 完了・キャンセル（allTから当日分）
+  var finishedActive=Object.values(allT).filter(function(t){
+    return t.dateStr===todayStr&&['done','cancelled'].indexOf(t.status)>=0;
+  });
+  // 履歴から当日完了分（allTに残っていないもの）
+  var histToday=histC.filter(function(h){return h.dateISO===todayStr;});
+
+  var cntDone=0,cntCancelled=0;
+
+  // allTにある完了・キャンセルをカード表示
+  finishedActive.sort(function(a,b){return parseInt(a.ticketNum)-parseInt(b.ticketNum);});
+  finishedActive.forEach(function(t){
+    if(t.status==='done')cntDone++;
+    if(t.status==='cancelled')cntCancelled++;
+    renderTodayCard(t,grid,false);
+  });
+
+  // 履歴にのみある完了分（allTから消えたもの）
+  histToday.forEach(function(h){
+    var inActive=finishedActive.find(function(t){return t.ticketNum===h.ticketNum;});
+    if(!inActive){
+      cntDone++;
+      renderTodayCard(h,grid,true);
+    }
+  });
+
+  var total=cntDone+cntCancelled;
+  document.getElementById('todayStats').innerHTML=
+    '<div style="background:var(--success-soft);border:1px solid rgba(0,122,56,0.2);border-radius:9px;padding:8px 14px;font-size:12px;font-weight:700;color:var(--success)">✅ 完了 '+cntDone+'件</div>'+
+    '<div style="background:var(--danger-soft);border:1px solid rgba(217,0,25,0.15);border-radius:9px;padding:8px 14px;font-size:12px;font-weight:700;color:var(--danger)">❌ キャンセル '+cntCancelled+'件</div>'+
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 14px;font-size:12px;font-weight:700;color:var(--muted)">合計 '+total+'番号</div>';
+
+  if(total===0){
+    grid.style.display='none';emptyEl.style.display='block';
+  }else{
+    grid.style.display='';emptyEl.style.display='none';
+  }
+}
+
+function renderTodayCard(t,grid,isHistOnly){
+  var card=document.createElement('div');
+  var sc=t.status==='done'?'done':'cancelled';
+  card.className='ticket-card status-'+sc;
+  var bl=t.status==='done'?'完了':'キャンセル';
+  var tags=t.tags||[];
+  var tagsHtml='<div class="card-tags">'+tags.map(function(tid){
+    var tag=TAGS.find(function(x){return x.id===tid;});
+    return tag?'<span class="card-tag '+tag.type+'">'+tag.label+'</span>':'';
+  }).join('')+'</div>';
+
+  // 工程時間
+  var stepTimes=t.stepTimes||{};
+  var stepsHtml=PROC.map(function(p){
+    var done=stepTimes[p.id]>0;
+    var cls=done?'done-step':'pending';
+    var ts=done?fmt(stepTimes[p.id]):'';
+    return '<div class="step '+cls+'" title="'+p.name+'">'+p.icon+'<div class="step-time">'+ts+'</div></div>';
+  }).join('');
+
+  var total=t.total||Object.values(stepTimes).reduce(function(a,b){return a+b;},0);
+  var totalStr=total>0?fmt(total):'-';
+
+  // BN工程
+  var bnId=null,bnMs=0;
+  Object.entries(stepTimes).forEach(function(e){if(e[1]>bnMs){bnMs=e[1];bnId=e[0];}});
+  var bnP=PROC.find(function(p){return p.id===bnId;});
+  var bnStr=bnP?'<span style="font-size:11px;color:var(--danger);font-weight:700;">BN: '+bnP.name+'</span>':'';
+
+  var statusBadge='<span class="ticket-badge badge-'+sc+'">'+bl+'</span>';
+
+  // 計測中に戻すボタン（キャンセルのみ、履歴のみのものは不可）
+  var restoreBtn='';
+  if(t.status==='cancelled'&&!isHistOnly&&t.id){
+    restoreBtn='<button class="tbtn tbtn-restore" style="margin-top:8px;flex:1" id="restore-'+t.id+'">▶ 計測中に戻す</button>';
+  }
+  // 完了を計測中に戻す（allTにある場合）
+  var reopenBtn='';
+  if(t.status==='done'&&!isHistOnly&&t.id){
+    reopenBtn='<button class="tbtn" style="margin-top:8px;flex:1;background:var(--pause-soft);color:var(--pause);border:1px solid rgba(184,112,0,0.22);" id="reopen-'+t.id+'">↩ 最終工程から再計測</button>';
+  }
+
+  card.innerHTML=
+    '<div class="ticket-header"><div class="ticket-num">No.'+t.ticketNum+'</div>'+statusBadge+'</div>'+
+    tagsHtml+
+    '<div class="steps">'+stepsHtml+'</div>'+
+    '<div class="total-time">合計: <span>'+totalStr+'</span></div>'+
+    bnStr+
+    (restoreBtn||reopenBtn?'<div class="ticket-buttons">'+(restoreBtn||reopenBtn)+'</div>':'');
+
+  grid.appendChild(card);
+
+  // イベント付与
+  if(t.id){
+    var rb=card.querySelector('#restore-'+t.id);
+    if(rb)(function(id){rb.addEventListener('click',function(){restoreTicket(id);switchTab('measure');});})(t.id);
+    var rpb=card.querySelector('#reopen-'+t.id);
+    if(rpb)(function(id){rpb.addEventListener('click',function(){reopenTicket(id);switchTab('measure');});})(t.id);
+  }
+}
+
+function reopenTicket(id){
+  var t=allT[id];if(!t||t.status!=='done')return;
+  var now=Date.now();
+  // 最後の工程を削除して再計測
+  var lastStep=PROC[PROC.length-1];
+  delete t.stepTimes[lastStep.id];
+  t.currentStep=PROC.length-1;
+  t.status='active';t.stepStart=now;t.pauseAccum=0;t.pauseStart=null;t.totalEnd=null;
+  pushT(t);renderAll();updateCountBadge();showToast('No.'+t.ticketNum+' を計測中に戻しました');
+  if(!tickInt)tickInt=setInterval(renderTimers,500);
+}
+
 
 // ANALYSIS
 var outlierEnabled=false;
@@ -1148,10 +1269,13 @@ function clearHiyariFilter(){document.getElementById('hiyariFilterFrom').value='
 function fmt(ms){var s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2800);}
 function switchTab(name){
-  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',['measure','analysis','history','hiyari'][i]===name);});
+  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',['measure','today','analysis','history','hiyari'][i]===name);});
   document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active');});
   document.getElementById('tab-'+name).classList.add('active');
-  if(name==='analysis')updateAnalysis();if(name==='history')updateHistory();if(name==='hiyari')updateHiyariTab();
+  if(name==='today')updateTodayTab();
+  if(name==='analysis')updateAnalysis();
+  if(name==='history')updateHistory();
+  if(name==='hiyari')updateHiyariTab();
 }
 function updateClock(){var n=new Date();document.getElementById('clockDisplay').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0');}
 

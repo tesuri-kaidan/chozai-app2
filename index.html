@@ -302,7 +302,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   </div>
 
   <div id="tab-analysis" class="tab-content">
-    <div style="text-align:right;margin-bottom:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+      <button class="btn-csv" onclick="exportAnalysisCSV()" style="font-size:12px;padding:7px 14px;">⬇ 分析CSV</button>
       <button onclick="toggleHistory()" id="historyToggleBtn" style="padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--muted);">📋 履歴を表示</button>
     </div>
     <div class="filter-bar">
@@ -355,25 +356,65 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   </div>
 
   <div id="tab-hiyari" class="tab-content">
-    <div class="filter-bar">
-      <label>日付</label><input type="date" class="filter-input" id="hiyariFilterFrom"><label>〜</label><input type="date" class="filter-input" id="hiyariFilterTo">
-      <label>記載</label>
-      <select class="filter-input" id="hiyariFilterStatus"><option value="">すべて</option><option value="pending">未記載</option><option value="done">記載済</option></select>
-      <button class="btn-filter" onclick="updateHiyariTab()">絞り込み</button>
-      <button class="btn-filter sec" onclick="clearHiyariFilter()">クリア</button>
+
+    <!-- 本日分のみ記載可能バナー -->
+    <div style="background:var(--pause-soft);border:1px solid rgba(184,112,0,0.3);border-radius:10px;padding:9px 14px;margin-bottom:10px;font-size:12px;color:var(--pause);font-weight:700;">
+      ⚠ ヒヤリハットの記載は<strong>当日分のみ</strong>可能です
     </div>
-    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
-      <div class="stat-card"><div class="stat-value" id="hStatTotal">0</div><div class="stat-label">総件数</div></div>
-      <div class="stat-card"><div class="stat-value" id="hStatPending" style="color:var(--hiyari)">0</div><div class="stat-label">未記載</div></div>
-      <div class="stat-card"><div class="stat-value" id="hStatPendingRate" style="color:var(--hiyari)">-</div><div class="stat-label">未記載率</div></div>
+
+    <!-- サマリーカード -->
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px;">
+      <div class="stat-card"><div class="stat-value" id="hStatTotal">0</div><div class="stat-label">総件数（全期間）</div></div>
+      <div class="stat-card"><div class="stat-value" id="hStatPending" style="color:var(--hiyari)">0</div><div class="stat-label">未記載（全期間）</div></div>
+      <div class="stat-card"><div class="stat-value" id="hStatPendingRate" style="color:var(--hiyari)">-</div><div class="stat-label">未記載率（全期間）</div></div>
     </div>
-    <div class="section-title">工程別 発生件数</div>
+
+    <!-- 日別・週別・月別 未記入率 -->
+    <div class="section-title">日別 未記入状況</div>
+    <div class="chart-container" id="hiyariDailyChart"><div class="empty-state" style="padding:16px"><div class="icon">📅</div><p>データがありません</p></div></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+      <div>
+        <div class="section-title" style="margin-top:0;">週間サマリー（月〜日）</div>
+        <div class="chart-container" style="margin-bottom:0;" id="hiyariWeekChart"><div class="empty-state" style="padding:16px"><p>データなし</p></div></div>
+        <div class="chart-container" style="margin-top:10px;" id="hiyariWeekMemo">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">📝 週間対策メモ</div>
+          <textarea id="weekMemoText" class="hiyari-textarea" style="min-height:80px;" placeholder="週間の振り返り・対策を記入..."></textarea>
+          <button onclick="saveWeekMemo()" style="margin-top:6px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">保存</button>
+        </div>
+      </div>
+      <div>
+        <div class="section-title" style="margin-top:0;">月間サマリー</div>
+        <div class="chart-container" style="margin-bottom:0;" id="hiyariMonthChart"><div class="empty-state" style="padding:16px"><p>データなし</p></div></div>
+        <div class="chart-container" style="margin-top:10px;" id="hiyariMonthMemo">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:6px;">📝 月間対策メモ</div>
+          <textarea id="monthMemoText" class="hiyari-textarea" style="min-height:80px;" placeholder="月間の振り返り・対策を記入..."></textarea>
+          <button onclick="saveMonthMemo()" style="margin-top:6px;width:100%;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工程別・時間帯別・原因分析 -->
+    <div class="section-title">工程別 発生件数（多い順に強調）</div>
     <div class="chart-container" id="hiyariStepChart"><div class="empty-state" style="padding:20px"><div class="icon">⚠</div><p>データがありません</p></div></div>
     <div class="section-title">時間帯別 発生件数</div>
     <div class="chart-container" id="hiyariTimeChart"><div class="empty-state" style="padding:20px"><div class="icon">⏰</div><p>データがありません</p></div></div>
     <div class="section-title">ミス内容・原因 分析（上位10件）</div>
     <div class="chart-container" id="hiyariCauseChart"><div class="empty-state" style="padding:20px"><div class="icon">🔍</div><p>データがありません</p></div></div>
-    <div class="section-title">ヒヤリハット一覧</div>
+
+    <!-- 一覧 -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+      <div class="section-title" style="margin:0;">ヒヤリハット一覧</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <select class="filter-input" id="hiyariFilterStatus" style="font-size:11px;"><option value="">すべて</option><option value="pending">未記載</option><option value="done">記載済</option></select>
+        <input type="date" class="filter-input" id="hiyariFilterFrom" style="font-size:11px;">
+        <label style="font-size:11px;color:var(--muted);">〜</label>
+        <input type="date" class="filter-input" id="hiyariFilterTo" style="font-size:11px;">
+        <button class="btn-filter" onclick="updateHiyariTab()" style="font-size:11px;padding:5px 10px;">絞込</button>
+        <button class="btn-filter sec" onclick="clearHiyariFilter()" style="font-size:11px;padding:5px 10px;">クリア</button>
+        <button class="btn-csv" onclick="exportHiyariCSV()" style="font-size:11px;padding:5px 10px;">⬇CSV</button>
+      </div>
+    </div>
     <div class="table-wrap">
       <table class="data-table" style="min-width:700px;">
         <thead><tr><th>日付</th><th>時刻</th><th>番号</th><th>発生工程</th><th>記載状況</th><th>ミス内容</th><th>原因</th><th>操作</th></tr></thead>
@@ -623,7 +664,7 @@ function launchApp(){
   document.getElementById('setupScreen').style.display='none';
   document.getElementById('mainApp').style.display='block';
   document.getElementById('storeLabel').textContent=SC;
-  buildTagChips();startListening();
+  buildTagChips();startListening();loadMemos();
   setInterval(updateClock,1000);updateClock();
   setInterval(function(){var d=getToday();if(d!==todayStr){todayStr=d;fRef('tickets').remove();allT={};renderAll();showToast('🌅 日付が変わりました。番号をリセットしました');}},30000);
 }
@@ -655,6 +696,7 @@ function startListening(){
     var d=snap.val();hiyC=d?Object.values(d):[];
     // 未記載件数をチェックしてタブを目立たせる
     var totalPending=hiyC.filter(function(h){return!h.written;}).length;
+    refreshHiyariTabBadge();
     var hbt=document.getElementById('hiyariTab');
     if(hbt){
       if(totalPending>0){
@@ -957,6 +999,31 @@ function updateHistory(){
 function clearFilter(){document.getElementById('filterFrom').value='';document.getElementById('filterTo').value='';document.getElementById('filterTag').value='';updateAnalysis();}
 function clearHistFilter(){document.getElementById('histFilterFrom').value='';document.getElementById('histFilterTo').value='';document.getElementById('histFilterTag').value='';updateHistory();}
 function clearHistory(){if(!confirm('この店舗の全履歴を削除しますか？'))return;histC=[];fRef('history').remove();updateHistory();updateAnalysis();showToast('履歴を削除しました');}
+function exportAnalysisCSV(){
+  var done=getFiltered('filterFrom','filterTo','filterTag').filter(function(h){return h.status==='done';});
+  if(!done.length){showToast('出力するデータがありません');return;}
+  var avgs={},cnts={};
+  PROC.forEach(function(p){avgs[p.id]=0;cnts[p.id]=0;});
+  done.forEach(function(h){PROC.forEach(function(p){if(h.stepTimes&&h.stepTimes[p.id]){avgs[p.id]+=h.stepTimes[p.id];cnts[p.id]++;}});});
+  PROC.forEach(function(p){avgs[p.id]=cnts[p.id]?avgs[p.id]/cnts[p.id]:0;});
+  var headers=['集計期間','完了件数','平均合計(秒)'].concat(PROC.map(function(p){return p.name+'平均(秒)';})).concat(['疑義照会率','疑義照会平均(秒)','BN工程']);
+  var from=document.getElementById('filterFrom').value||done[done.length-1].dateISO;
+  var to=document.getElementById('filterTo').value||done[0].dateISO;
+  var gD=done.filter(function(h){return(h.giqiCount||0)>0;});
+  var avgTotal=done.reduce(function(a,h){return a+(h.total||0);},0)/done.length;
+  var avgGiqi=gD.length?gD.reduce(function(a,h){return a+(h.giqiTotalMs||0);},0)/gD.length:0;
+  var bnId=Object.entries(avgs).sort(function(a,b){return b[1]-a[1];})[0][0];
+  var bnName=(PROC.find(function(p){return p.id===bnId;})||{}).name||'-';
+  var row=[from+'〜'+to, done.length, (avgTotal/1000).toFixed(1)]
+    .concat(PROC.map(function(p){return (avgs[p.id]/1000).toFixed(1);}))
+    .concat([Math.round(gD.length/done.length*100)+'%',(avgGiqi/1000).toFixed(1),bnName]);
+  var csv='﻿'+[headers,row].map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('
+');
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='分析_'+SC+'_'+getToday()+'.csv';a.click();URL.revokeObjectURL(a.href);
+  showToast('✓ 分析CSVを出力しました');
+}
+
 function exportCSV(){
   var history=getFiltered('histFilterFrom','histFilterTo','histFilterTag');
   if(!history.length){showToast('出力するデータがありません');return;}
@@ -1264,49 +1331,237 @@ function closeHiyariWriteModal(){
   }
   hiyEditId=null;
 }
-function updateHiyariTab(){
-  var from=document.getElementById('hiyariFilterFrom').value,to=document.getElementById('hiyariFilterTo').value,st=document.getElementById('hiyariFilterStatus').value;
-  var filtered=hiyC.filter(function(h){if(from&&h.dateISO<from)return false;if(to&&h.dateISO>to)return false;if(st==='pending'&&h.written)return false;if(st==='done'&&!h.written)return false;return true;});
-  var pending=filtered.filter(function(h){return!h.written;});
-  document.getElementById('hStatTotal').textContent=filtered.length;
-  document.getElementById('hStatPending').textContent=pending.length;
-  document.getElementById('hStatPendingRate').textContent=filtered.length?Math.round(pending.length/filtered.length*100)+'%':'-';
-  // 未記載があればタブを目立たせる
-  var hiyariTabBtn=document.getElementById('hiyariTab');
-  var totalPending=hiyC.filter(function(h){return!h.written;}).length;
-  if(hiyariTabBtn){
-    if(totalPending>0){
-      hiyariTabBtn.textContent='⚠ ヒヤリ '+totalPending+'件';
-      hiyariTabBtn.style.background=hiyariTabBtn.classList.contains('active')?'var(--hiyari)':'var(--hiyari-soft)';
-      hiyariTabBtn.style.color=hiyariTabBtn.classList.contains('active')?'#fff':'var(--hiyari)';
-      hiyariTabBtn.style.borderColor='var(--hiyari)';
-      hiyariTabBtn.style.animation='pulse 1.5s ease-in-out infinite';
-    }else{
-      hiyariTabBtn.textContent='⚠ ヒヤリ';
-      hiyariTabBtn.style.background='';hiyariTabBtn.style.color='';
-      hiyariTabBtn.style.borderColor='';hiyariTabBtn.style.animation='';
-    }
-  }
-  var sc={};PROC.forEach(function(p){sc[p.id]=0;});filtered.forEach(function(h){var p=PROC[h.step];if(p)sc[p.id]++;});
-  var mx=Math.max.apply(null,Object.values(sc).concat([1]));
-  document.getElementById('hiyariStepChart').innerHTML=PROC.map(function(p){return '<div class="bar-row"><div class="bar-label">'+p.icon+' '+p.name+'</div><div class="bar-wrap"><div class="bar-fill hiy" style="width:'+Math.max(sc[p.id]/mx*100,sc[p.id]>0?4:0)+'%">'+sc[p.id]+'件</div></div><span style="width:36px;flex-shrink:0"></span></div>';}).join('');
-  var hc={};for(var i=0;i<24;i++)hc[i]=0;filtered.forEach(function(h){if(h.hour!==undefined)hc[h.hour]++;});
-  var mxH=Math.max.apply(null,Object.values(hc).concat([1]));
-  var hd=Object.entries(hc).filter(function(e){return e[1]>0;});
-  document.getElementById('hiyariTimeChart').innerHTML=hd.length?hd.map(function(e){return '<div class="bar-row"><div class="bar-label" style="font-family:\'JetBrains Mono\',monospace">'+String(e[0]).padStart(2,'0')+':00〜</div><div class="bar-wrap"><div class="bar-fill hiy" style="width:'+Math.max(e[1]/mxH*100,4)+'%">'+e[1]+'件</div></div><span style="width:36px;flex-shrink:0"></span></div>';}).join(''):'<div class="empty-state" style="padding:20px"><p>データなし</p></div>';
-  var cc={};filtered.filter(function(h){return h.written;}).forEach(function(h){(h.cause||[]).forEach(function(c){cc[c]=(cc[c]||0)+1;});(h.mistake||[]).forEach(function(c){cc['間違い：'+c]=(cc['間違い：'+c]||0)+1;});});
-  var ce=Object.entries(cc).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
-  var mxC=Math.max.apply(null,ce.map(function(e){return e[1];}).concat([1]));
-  document.getElementById('hiyariCauseChart').innerHTML=ce.length?ce.map(function(e){return '<div class="bar-row"><div class="bar-label" style="font-size:10px">'+e[0]+'</div><div class="bar-wrap"><div class="bar-fill hiy" style="width:'+Math.max(e[1]/mxC*100,4)+'%">'+e[1]+'件</div></div><span style="width:36px;flex-shrink:0"></span></div>';}).join(''):'<div class="empty-state" style="padding:20px"><p>記載済データがありません</p></div>';
-  var tbody=document.getElementById('hiyariBody');
-  if(!filtered.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="icon">⚠</div><p>ヒヤリハットの記録がありません</p></div></td></tr>';return;}
-  tbody.innerHTML=filtered.slice().reverse().map(function(h){
-    var stH=h.written?'<span class="tag tag-done">記載済</span>':'<span class="pending-badge">未記載</span>';
-    var wB='<button class="btn-write" onclick="openHiyariWriteById(\''+h.id+'\')">'+(h.written?'編集':'記載する')+'</button>';
-    return '<tr><td style="font-family:\'JetBrains Mono\',monospace">'+(h.date||'')+'</td><td style="font-family:\'JetBrains Mono\',monospace">'+(h.time||'')+'</td><td style="font-family:\'JetBrains Mono\',monospace;font-weight:700">No.'+h.ticketNum+'</td><td>'+(h.stepName||'')+'</td><td>'+stH+'</td><td style="font-size:11px">'+((h.mistake||[]).slice(0,3).join('・')||'-')+'</td><td style="font-size:11px">'+((h.cause||[]).slice(0,2).join('・')||'-')+'</td><td>'+wB+'</td></tr>';
-  }).join('');
+// ---- ヒヤリハット ユーティリティ ----
+function getWeekKey(d){
+  var day=d.getDay();
+  var mon=new Date(d);mon.setDate(d.getDate()-(day===0?6:day-1));
+  return mon.toISOString().slice(0,10);
 }
-function clearHiyariFilter(){document.getElementById('hiyariFilterFrom').value='';document.getElementById('hiyariFilterTo').value='';document.getElementById('hiyariFilterStatus').value='';updateHiyariTab();}
+function getMonthKey(d){return d.toISOString().slice(0,7);}
+
+// メモ保存・読み込み
+function saveWeekMemo(){
+  var txt=document.getElementById('weekMemoText').value;
+  fRef('memos/week_'+getWeekKey(new Date())).set(txt);
+  showToast('週間メモを保存しました');
+}
+function saveMonthMemo(){
+  var txt=document.getElementById('monthMemoText').value;
+  fRef('memos/month_'+getMonthKey(new Date())).set(txt);
+  showToast('月間メモを保存しました');
+}
+function loadMemos(){
+  fRef('memos').on('value',function(snap){
+    var m=snap.val()||{};
+    var wEl=document.getElementById('weekMemoText');
+    var mEl=document.getElementById('monthMemoText');
+    if(wEl)wEl.value=m['week_'+getWeekKey(new Date())]||'';
+    if(mEl)mEl.value=m['month_'+getMonthKey(new Date())]||'';
+  });
+}
+
+// バーHTML生成（多いほど強調色）
+function makeBar(label,pend,total,isBiggest){
+  if(total===0)return '';
+  var rate=Math.round(pend/total*100);
+  var hot=pend>0;
+  var cls=isBiggest?'bn':hot?'hiy':'fst';
+  var badge=isBiggest?'<span class="bn-badge">最多</span>':'<span style="width:50px;flex-shrink:0;text-align:right;font-size:10px;font-weight:700;color:'+(hot?'var(--hiyari)':'var(--success)')+'">'+rate+'%</span>';
+  return '<div class="bar-row">'
+    +'<div class="bar-label" style="font-size:11px;font-family:\'JetBrains Mono\',monospace;">'+label+'</div>'
+    +'<div class="bar-wrap"><div class="bar-fill '+cls+'" style="width:'+Math.max(rate,pend>0?4:0)+'%">'+pend+'/'+total+'</div></div>'
+    +badge+'</div>';
+}
+
+// タブ強調
+function refreshHiyariTabBadge(){
+  var tp=hiyC.filter(function(h){return!h.written;}).length;
+  var btn=document.getElementById('hiyariTab');
+  if(!btn)return;
+  if(tp>0){
+    btn.textContent='⚠ ヒヤリ '+tp+'件';
+    btn.style.background=btn.classList.contains('active')?'var(--hiyari)':'var(--hiyari-soft)';
+    btn.style.color=btn.classList.contains('active')?'#fff':'var(--hiyari)';
+    btn.style.animation='pulse 1.5s ease-in-out infinite';
+  }else{
+    btn.textContent='⚠ ヒヤリ';
+    btn.style.background='';btn.style.color='';btn.style.animation='';
+  }
+}
+
+function updateHiyariTab(){
+  refreshHiyariTabBadge();
+
+  var from=document.getElementById('hiyariFilterFrom').value;
+  var to=document.getElementById('hiyariFilterTo').value;
+  var st=document.getElementById('hiyariFilterStatus').value;
+  var filtered=hiyC.filter(function(h){
+    if(from&&h.dateISO<from)return false;
+    if(to&&h.dateISO>to)return false;
+    if(st==='pending'&&h.written)return false;
+    if(st==='done'&&!h.written)return false;
+    return true;
+  });
+
+  // 全期間サマリー
+  var allPend=hiyC.filter(function(h){return!h.written;}).length;
+  document.getElementById('hStatTotal').textContent=hiyC.length;
+  document.getElementById('hStatPending').textContent=allPend;
+  document.getElementById('hStatPendingRate').textContent=hiyC.length?Math.round(allPend/hiyC.length*100)+'%':'-';
+
+  // ── 日別（直近14日）──
+  var days=[];
+  for(var di=13;di>=0;di--){var dd=new Date();dd.setDate(dd.getDate()-di);days.push(dd.toISOString().slice(0,10));}
+  var dayBars=days.map(function(iso){
+    var items=hiyC.filter(function(h){return h.dateISO===iso;});
+    if(!items.length)return '';
+    return makeBar(iso.slice(5).replace('-','/'), items.filter(function(h){return!h.written;}).length, items.length, false);
+  }).filter(Boolean).join('');
+  // 最多の日を強調
+  var dayTotals=days.map(function(iso){return hiyC.filter(function(h){return h.dateISO===iso;}).length;});
+  var mxDay=Math.max.apply(null,dayTotals.concat([0]));
+  if(mxDay>0){
+    var dayBarsArr=days.map(function(iso){
+      var items=hiyC.filter(function(h){return h.dateISO===iso;});
+      if(!items.length)return '';
+      return makeBar(iso.slice(5).replace('-','/'), items.filter(function(h){return!h.written;}).length, items.length, items.length===mxDay);
+    }).filter(Boolean);
+    dayBars=dayBarsArr.join('');
+  }
+  document.getElementById('hiyariDailyChart').innerHTML=dayBars||'<div class="empty-state" style="padding:16px"><div class="icon">📅</div><p>データがありません</p></div>';
+
+  // ── 週別（直近6週）──
+  var weekRows=[];
+  for(var wi=5;wi>=0;wi--){
+    var wd=new Date();wd.setDate(wd.getDate()-wi*7);
+    var wk=getWeekKey(wd);
+    var wkEnd=new Date(wk);wkEnd.setDate(wkEnd.getDate()+6);
+    var wkEndIso=wkEnd.toISOString().slice(0,10);
+    var wItems=hiyC.filter(function(h){return h.dateISO>=wk&&h.dateISO<=wkEndIso;});
+    if(wItems.length)weekRows.push({label:wk.slice(5).replace('-','/')+'〜'+wkEndIso.slice(5).replace('-','/'),total:wItems.length,pend:wItems.filter(function(h){return!h.written;}).length});
+  }
+  var mxW=Math.max.apply(null,weekRows.map(function(w){return w.total;}).concat([0]));
+  document.getElementById('hiyariWeekChart').innerHTML=weekRows.length
+    ?weekRows.map(function(w){return makeBar(w.label,w.pend,w.total,w.total===mxW);}).join('')
+    :'<div class="empty-state" style="padding:16px"><p>データなし</p></div>';
+
+  // ── 月別（直近6ヶ月）──
+  var monthRows=[];
+  for(var mi=5;mi>=0;mi--){
+    var md=new Date();md.setMonth(md.getMonth()-mi);
+    var mk=getMonthKey(md);
+    var mItems=hiyC.filter(function(h){return h.dateISO&&h.dateISO.slice(0,7)===mk;});
+    if(mItems.length)monthRows.push({label:mk,total:mItems.length,pend:mItems.filter(function(h){return!h.written;}).length});
+  }
+  var mxM=Math.max.apply(null,monthRows.map(function(m){return m.total;}).concat([0]));
+  document.getElementById('hiyariMonthChart').innerHTML=monthRows.length
+    ?monthRows.map(function(m){return makeBar(m.label,m.pend,m.total,m.total===mxM);}).join('')
+    :'<div class="empty-state" style="padding:16px"><p>データなし</p></div>';
+
+  // ── 工程別（多い順に強調）──
+  var sc={};PROC.forEach(function(p){sc[p.id]=0;});
+  filtered.forEach(function(h){var p=PROC[h.step];if(p)sc[p.id]++;});
+  var mxSc=Math.max.apply(null,Object.values(sc).concat([0]));
+  var sortedProc=PROC.slice().sort(function(a,b){return sc[b.id]-sc[a.id];});
+  document.getElementById('hiyariStepChart').innerHTML=sortedProc.filter(function(p){return sc[p.id]>0;}).map(function(p){
+    var isBig=sc[p.id]===mxSc&&mxSc>0;
+    return '<div class="bar-row"><div class="bar-label">'+p.icon+' '+p.name+'</div>'
+      +'<div class="bar-wrap"><div class="bar-fill '+(isBig?'bn':'hiy')+'" style="width:'+Math.max(sc[p.id]/mxSc*100,4)+'%">'+sc[p.id]+'件</div></div>'
+      +(isBig?'<span class="bn-badge">最多</span>':'<span style="width:50px;flex-shrink:0"></span>')+'</div>';
+  }).join('')||'<div class="empty-state" style="padding:20px"><div class="icon">⚠</div><p>データがありません</p></div>';
+
+  // ── 時間帯別 ──
+  var hc={};for(var hi=0;hi<24;hi++)hc[hi]=0;
+  filtered.forEach(function(h){if(h.hour!==undefined)hc[h.hour]++;});
+  var mxH=Math.max.apply(null,Object.values(hc).concat([0]));
+  var hd=Object.entries(hc).filter(function(e){return e[1]>0;});
+  document.getElementById('hiyariTimeChart').innerHTML=hd.length?hd.map(function(e){
+    var isBig=parseInt(e[1])===mxH&&mxH>0;
+    return '<div class="bar-row"><div class="bar-label" style="font-family:\'JetBrains Mono\',monospace">'+String(e[0]).padStart(2,'0')+':00〜</div>'
+      +'<div class="bar-wrap"><div class="bar-fill '+(isBig?'bn':'hiy')+'" style="width:'+Math.max(e[1]/mxH*100,4)+'%">'+e[1]+'件</div></div>'
+      +(isBig?'<span class="bn-badge">最多</span>':'<span style="width:50px;flex-shrink:0"></span>')+'</div>';
+  }).join(''):'<div class="empty-state" style="padding:20px"><p>データなし</p></div>';
+
+  // ── 原因分析 ──
+  var cc={};
+  filtered.filter(function(h){return h.written;}).forEach(function(h){
+    (h.cause||[]).forEach(function(c){cc[c]=(cc[c]||0)+1;});
+    (h.mistake||[]).forEach(function(c){cc['間違い：'+c]=(cc['間違い：'+c]||0)+1;});
+  });
+  var ce=Object.entries(cc).sort(function(a,b){return b[1]-a[1];}).slice(0,10);
+  var mxC=Math.max.apply(null,ce.map(function(e){return e[1];}).concat([0]));
+  document.getElementById('hiyariCauseChart').innerHTML=ce.length?ce.map(function(e,i){
+    var isBig=i===0&&mxC>0;
+    return '<div class="bar-row"><div class="bar-label" style="font-size:10px">'+e[0]+'</div>'
+      +'<div class="bar-wrap"><div class="bar-fill '+(isBig?'bn':'hiy')+'" style="width:'+Math.max(e[1]/mxC*100,4)+'%">'+e[1]+'件</div></div>'
+      +(isBig?'<span class="bn-badge">最多</span>':'<span style="width:50px;flex-shrink:0"></span>')+'</div>';
+  }).join(''):'<div class="empty-state" style="padding:20px"><p>記載済データがありません</p></div>';
+
+  // ── 一覧 ──
+  var tbody=document.getElementById('hiyariBody');
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="icon">⚠</div><p>ヒヤリハットの記録がありません</p></div></td></tr>';
+    return;
+  }
+  // 未記載を上に、その後日時降順
+  var sorted=filtered.slice().sort(function(a,b){
+    if(!a.written&&b.written)return -1;
+    if(a.written&&!b.written)return 1;
+    return (b.ts||0)-(a.ts||0);
+  });
+  tbody.innerHTML='';
+  sorted.forEach(function(h){
+    var isToday=h.dateISO===todayStr;
+    var stH=h.written?'<span class="tag tag-done">記載済</span>':'<span class="pending-badge">未記載</span>';
+    var tr=document.createElement('tr');
+    if(!h.written)tr.style.background='var(--hiyari-soft)';
+    var btnId='hbtn-'+h.id;
+    var btnHtml='';
+    if(h.written){
+      btnHtml='<button class="btn-write" style="background:var(--muted)" id="'+btnId+'">編集</button>';
+    }else if(isToday){
+      btnHtml='<button class="btn-write" id="'+btnId+'">記載する</button>';
+    }else{
+      btnHtml='<span style="font-size:10px;color:var(--muted);">当日のみ記載可</span>';
+    }
+    tr.innerHTML='<td style="font-family:\'JetBrains Mono\',monospace">'+(h.date||'')+'</td>'
+      +'<td style="font-family:\'JetBrains Mono\',monospace">'+(h.time||'')+'</td>'
+      +'<td style="font-family:\'JetBrains Mono\',monospace;font-weight:700">No.'+h.ticketNum+'</td>'
+      +'<td>'+(h.stepName||'')+'</td>'
+      +'<td>'+stH+'</td>'
+      +'<td style="font-size:11px">'+((h.mistake||[]).slice(0,3).join('・')||'-')+'</td>'
+      +'<td style="font-size:11px">'+((h.cause||[]).slice(0,2).join('・')||'-')+'</td>'
+      +'<td>'+btnHtml+'</td>';
+    tbody.appendChild(tr);
+    var btn=document.getElementById(btnId);
+    if(btn)(function(hid){btn.addEventListener('click',function(){openHiyariWriteById(hid);});})(h.id);
+  });
+}
+
+function clearHiyariFilter(){
+  document.getElementById('hiyariFilterFrom').value='';
+  document.getElementById('hiyariFilterTo').value='';
+  document.getElementById('hiyariFilterStatus').value='';
+  updateHiyariTab();
+}
+
+function exportHiyariCSV(){
+  if(!hiyC.length){showToast('出力するデータがありません');return;}
+  var headers=['日付','時刻','番号','発生工程','記載状況','何を間違えたか','アラート','気づいたきっかけ','原因','メモ'];
+  var rows=hiyC.slice().sort(function(a,b){return(b.ts||0)-(a.ts||0);}).map(function(h){
+    return [h.date||'',h.time||'','No.'+h.ticketNum,h.stepName||'',h.written?'記載済':'未記載',
+      (h.mistake||[]).join('・'),(h.alert||[]).join('・'),(h.notice||[]).join('・'),
+      (h.cause||[]).join('・'),h.note||''];
+  });
+  var csv='\uFEFF'+[headers].concat(rows).map(function(r){
+    return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');
+  }).join('\r\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='ヒヤリハット_'+SC+'_'+getToday()+'.csv';
+  a.click();URL.revokeObjectURL(a.href);
+  showToast('✓ ヒヤリハットCSV '+rows.length+'件');
+}
 
 // UTILS
 function fmt(ms){var s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}

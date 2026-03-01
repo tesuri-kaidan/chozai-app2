@@ -363,17 +363,31 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
 
   <div id="tab-hiyari" class="tab-content">
 
-    <!-- 🔴 未記載アラート（上部・目立つ） -->
-    <div id="hiyariPendingAlert" style="display:none;background:var(--hiyari);border-radius:12px;padding:12px 16px;margin-bottom:12px;color:#fff;">
-      <div style="font-size:13px;font-weight:900;margin-bottom:8px;">⚠ 本日の未記載ヒヤリハット</div>
+    <!-- 🔴 本日の未記載アラート（最上部） -->
+    <div id="hiyariPendingAlert" style="display:none;background:var(--hiyari);border-radius:12px;padding:12px 16px;margin-bottom:10px;color:#fff;">
+      <div style="font-size:13px;font-weight:900;margin-bottom:8px;">⚠ 本日の未記載ヒヤリハット — タップして記載してください</div>
       <div id="hiyariPendingCards" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+
+    <!-- 本日分一覧（未記載が上） -->
+    <div id="hiyariTodaySection">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+        <div class="section-title" style="margin:0;color:var(--hiyari);">📋 本日のヒヤリハット</div>
+        <button class="btn-csv" onclick="exportHiyariCSV()" style="font-size:11px;padding:5px 10px;">⬇CSV</button>
+      </div>
+      <div class="table-wrap" style="margin-bottom:14px;">
+        <table class="data-table" style="min-width:700px;">
+          <thead><tr><th>時刻</th><th>番号</th><th>発生工程</th><th>記載状況</th><th>ミス内容</th><th>フリー記載</th><th>操作</th></tr></thead>
+          <tbody id="hiyariTodayBody"><tr><td colspan="7"><div class="empty-state" style="padding:16px"><p>本日のヒヤリハットはありません</p></div></td></tr></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- サマリー -->
     <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px;">
       <div class="stat-card"><div class="stat-value" id="hStatTotal">0</div><div class="stat-label">総件数</div></div>
-      <div class="stat-card" id="hStatPendingCard"><div class="stat-value" id="hStatPending" style="color:var(--hiyari)">0</div><div class="stat-label">未記載</div></div>
-      <div class="stat-card" id="hStatRateCard"><div class="stat-value" id="hStatPendingRate" style="color:var(--hiyari)">-</div><div class="stat-label">未記載率</div></div>
+      <div class="stat-card"><div class="stat-value" id="hStatPending" style="color:var(--hiyari)">0</div><div class="stat-label">未記載</div></div>
+      <div class="stat-card"><div class="stat-value" id="hStatPendingRate" style="color:var(--hiyari)">-</div><div class="stat-label">未記載率</div></div>
     </div>
 
     <!-- 月の4週分 対策メモ -->
@@ -404,9 +418,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
     <div class="section-title">ミス内容・原因 分析（上位10件）</div>
     <div class="chart-container" id="hiyariCauseChart"><div class="empty-state" style="padding:20px"><div class="icon">🔍</div><p>データがありません</p></div></div>
 
-    <!-- 一覧 -->
+    <!-- 過去分一覧（折りたたみ） -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
-      <div class="section-title" style="margin:0;">ヒヤリハット一覧</div>
+      <div class="section-title" style="margin:0;">過去のヒヤリハット一覧</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <select class="filter-input" id="hiyariFilterStatus" style="font-size:11px;"><option value="">すべて</option><option value="pending">未記載</option><option value="done">記載済</option></select>
         <input type="date" class="filter-input" id="hiyariFilterFrom" style="font-size:11px;">
@@ -414,13 +428,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
         <input type="date" class="filter-input" id="hiyariFilterTo" style="font-size:11px;">
         <button class="btn-filter" onclick="updateHiyariTab()" style="font-size:11px;padding:5px 10px;">絞込</button>
         <button class="btn-filter sec" onclick="clearHiyariFilter()" style="font-size:11px;padding:5px 10px;">クリア</button>
-        <button class="btn-csv" onclick="exportHiyariCSV()" style="font-size:11px;padding:5px 10px;">⬇CSV</button>
       </div>
     </div>
     <div class="table-wrap">
       <table class="data-table" style="min-width:700px;">
         <thead><tr><th>日付</th><th>時刻</th><th>番号</th><th>発生工程</th><th>記載状況</th><th>ミス内容</th><th>フリー記載</th><th>操作</th></tr></thead>
-        <tbody id="hiyariBody"><tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="icon">⚠</div><p>ヒヤリハットの記録がありません</p></div></td></tr></tbody>
+        <tbody id="hiyariBody"><tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="icon">⚠</div><p>過去のヒヤリハットはありません</p></div></td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1367,27 +1380,19 @@ function getWeekKey(d){
 function getMonthKey(d){return d.toISOString().slice(0,7);}
 
 // メモ保存・読み込み
-// 月の第N週を取得（1〜4）
-function getWeekOfMonth(d){
-  // その月の1日の曜日
-  var firstDay=new Date(d.getFullYear(),d.getMonth(),1).getDay();
-  var adjusted=(firstDay===0?6:firstDay-1); // 月曜=0
-  var week=Math.ceil((d.getDate()+adjusted)/7);
-  return Math.min(week,4); // 5週目は4週目に含める
-}
-
-// 月の第N週（1〜4）の月曜日を返す
-function getMonthWeekMonday(year,month,weekNum){
-  var firstDay=new Date(year,month,1);
-  var dayOfWeek=firstDay.getDay();
-  var adjusted=dayOfWeek===0?6:dayOfWeek-1;
-  // 第1週の月曜
-  var firstMonday=new Date(year,month,1-(adjusted===0?0:adjusted));
-  if(firstMonday.getMonth()<month||(firstMonday.getMonth()===month&&firstMonday.getDate()<1)){
-    firstMonday.setDate(firstMonday.getDate()+7);
-  }
-  firstMonday.setDate(firstMonday.getDate()+(weekNum-1)*7);
-  return firstMonday;
+// 月の第N週（1〜4）の開始日・終了日を返す（1日始まり、5週目は4週目に統合）
+function getMonthWeekRange(year, month, weekNum){
+  // 第N週の開始日 = 1 + (weekNum-1)*7
+  var startDay = 1 + (weekNum - 1) * 7;
+  var lastDay = new Date(year, month + 1, 0).getDate();
+  // 5週目以降は4週目に統合するので第4週の終わりは月末
+  var endDay = weekNum === 4 ? lastDay : Math.min(startDay + 6, lastDay);
+  return {
+    start: new Date(year, month, startDay),
+    end: new Date(year, month, endDay),
+    startDay: startDay,
+    endDay: endDay
+  };
 }
 
 function renderWeekMemoGrid(){
@@ -1398,11 +1403,10 @@ function renderWeekMemoGrid(){
   grid.innerHTML='';
   for(var w=1;w<=4;w++){
     (function(wn){
-      var mon=getMonthWeekMonday(year,month,wn);
-      var sun=new Date(mon);sun.setDate(mon.getDate()+6);
-      var label='第'+wn+'週（'+
-        (mon.getMonth()+1)+'/'+mon.getDate()+'〜'+
-        (sun.getMonth()+1)+'/'+sun.getDate()+'）';
+      var range=getMonthWeekRange(year,month,wn);
+      var m=month+1;
+      var label='第'+wn+'週（'+m+'/'+range.startDay+'〜'+m+'/'+range.endDay+'）';
+      if(wn===4){label='第4週（'+m+'/'+range.startDay+'〜月末）';}
       var key='monthweek_'+year+'_'+month+'_'+wn;
       var div=document.createElement('div');
       div.className='chart-container';
@@ -1411,11 +1415,10 @@ function renderWeekMemoGrid(){
         '<div style="font-size:11px;font-weight:900;color:var(--accent);margin-bottom:6px;">📝 '+label+'</div>'
         +'<textarea class="hiyari-textarea" id="wmemo-'+wn+'" style="min-height:90px;" placeholder="この週の対策・振り返りを記入（保存必須）..."></textarea>'
         +'<div style="display:flex;gap:6px;margin-top:6px;">'
-        +'<button id="wbtn-'+wn+'" onclick="saveMonthWeekMemo('+wn+')" style="flex:1;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--ff,sans-serif);">保存</button>'
+        +'<button onclick="saveMonthWeekMemo('+wn+')" style="flex:1;padding:8px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:sans-serif;">保存</button>'
         +'<div id="wstamp-'+wn+'" style="display:none;flex:1;padding:8px;background:var(--success-soft);border:1px solid var(--success);border-radius:7px;font-size:11px;font-weight:700;color:var(--success);text-align:center;"></div>'
         +'</div>';
       grid.appendChild(div);
-      // Firebaseから読み込み
       fRef('memos/'+key).once('value',function(snap){
         var data=snap.val();
         if(data){
@@ -1610,45 +1613,71 @@ function updateHiyariTab(){
       +(isBig?'<span class="bn-badge">最多</span>':'<span style="width:50px;flex-shrink:0"></span>')+'</div>';
   }).join(''):'<div class="empty-state" style="padding:20px"><p>記載済データがありません</p></div>';
 
-  // ── 一覧 ──
-  var tbody=document.getElementById('hiyariBody');
-  if(!filtered.length){
-    tbody.innerHTML='<tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="icon">⚠</div><p>ヒヤリハットの記録がありません</p></div></td></tr>';
-    return;
-  }
-  // 未記載を上に、その後日時降順
-  var sorted=filtered.slice().sort(function(a,b){
+  // ── 本日分（未記載→記載済の順、最上部に表示） ──
+  var todayItems=hiyC.filter(function(h){return h.dateISO===todayStr;});
+  todayItems.sort(function(a,b){
     if(!a.written&&b.written)return -1;
     if(a.written&&!b.written)return 1;
-    return (b.ts||0)-(a.ts||0);
+    return (a.ts||0)-(b.ts||0);
   });
-  tbody.innerHTML='';
-  sorted.forEach(function(h){
-    var isToday=h.dateISO===todayStr;
-    var stH=h.written?'<span class="tag tag-done">記載済</span>':'<span class="pending-badge">未記載</span>';
-    var tr=document.createElement('tr');
-    if(!h.written)tr.style.background='var(--hiyari-soft)';
-    var btnId='hbtn-'+h.id;
-    var btnHtml='';
-    if(h.written){
-      btnHtml='<button class="btn-write" style="background:var(--muted)" id="'+btnId+'">編集</button>';
-    }else if(isToday){
-      btnHtml='<button class="btn-write" id="'+btnId+'">記載する</button>';
+  var todayTbody=document.getElementById('hiyariTodayBody');
+  if(todayTbody){
+    if(!todayItems.length){
+      todayTbody.innerHTML='<tr><td colspan="7"><div class="empty-state" style="padding:14px"><p>本日のヒヤリハットはありません</p></div></td></tr>';
     }else{
-      btnHtml='<span style="font-size:10px;color:var(--muted);">当日のみ記載可</span>';
+      todayTbody.innerHTML='';
+      todayItems.forEach(function(h){
+        var stH=h.written?'<span class="tag tag-done">記載済</span>':'<span class="pending-badge">未記載</span>';
+        var tr=document.createElement('tr');
+        if(!h.written)tr.style.cssText='background:var(--hiyari-soft);font-weight:700;';
+        var btnId='hbtn-t-'+h.id;
+        var btnHtml=h.written
+          ?'<button class="btn-write" style="background:var(--muted)" id="'+btnId+'">編集</button>'
+          :'<button class="btn-write" id="'+btnId+'" style="background:var(--hiyari);">記載する！</button>';
+        tr.innerHTML=
+          '<td style="font-family:monospace">'+(h.time||'')+'</td>'
+          +'<td style="font-family:monospace;font-weight:700">No.'+h.ticketNum+'</td>'
+          +'<td>'+(h.stepName||'')+'</td>'
+          +'<td>'+stH+'</td>'
+          +'<td style="font-size:11px">'+((h.mistake||[]).slice(0,3).join('・')||'-')+'</td>'
+          +'<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(h.note||'-')+'</td>'
+          +'<td>'+btnHtml+'</td>';
+        todayTbody.appendChild(tr);
+        var btn=document.getElementById(btnId);
+        if(btn)(function(hid){btn.addEventListener('click',function(){openHiyariWriteById(hid);});})(h.id);
+      });
     }
-    tr.innerHTML='<td style="font-family:\'JetBrains Mono\',monospace">'+(h.date||'')+'</td>'
-      +'<td style="font-family:\'JetBrains Mono\',monospace">'+(h.time||'')+'</td>'
-      +'<td style="font-family:\'JetBrains Mono\',monospace;font-weight:700">No.'+h.ticketNum+'</td>'
-      +'<td>'+(h.stepName||'')+'</td>'
-      +'<td>'+stH+'</td>'
-      +'<td style="font-size:11px">'+((h.mistake||[]).slice(0,3).join('・')||'-')+'</td>'
-      +'<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+( h.note||'-')+'</td>'
-      +'<td>'+btnHtml+'</td>';
-    tbody.appendChild(tr);
-    var btn=document.getElementById(btnId);
-    if(btn)(function(hid){btn.addEventListener('click',function(){openHiyariWriteById(hid);});})(h.id);
-  });
+  }
+
+  // ── 過去分（フィルタ適用・本日除く・日時降順） ──
+  var pastItems=filtered.filter(function(h){return h.dateISO!==todayStr;});
+  pastItems.sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+  var tbody=document.getElementById('hiyariBody');
+  if(!pastItems.length){
+    tbody.innerHTML='<tr><td colspan="8"><div class="empty-state" style="padding:20px"><p>過去のヒヤリハットはありません</p></div></td></tr>';
+  }else{
+    tbody.innerHTML='';
+    pastItems.forEach(function(h){
+      var stH=h.written?'<span class="tag tag-done">記載済</span>':'<span class="pending-badge">未記載</span>';
+      var tr=document.createElement('tr');
+      var btnId='hbtn-p-'+h.id;
+      var btnHtml=h.written
+        ?'<button class="btn-write" style="background:var(--muted)" id="'+btnId+'">編集</button>'
+        :'<span style="font-size:10px;color:var(--muted);">当日のみ記載可</span>';
+      tr.innerHTML=
+        '<td style="font-family:monospace">'+(h.date||'')+'</td>'
+        +'<td style="font-family:monospace">'+(h.time||'')+'</td>'
+        +'<td style="font-family:monospace;font-weight:700">No.'+h.ticketNum+'</td>'
+        +'<td>'+(h.stepName||'')+'</td>'
+        +'<td>'+stH+'</td>'
+        +'<td style="font-size:11px">'+((h.mistake||[]).slice(0,3).join('・')||'-')+'</td>'
+        +'<td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(h.note||'-')+'</td>'
+        +'<td>'+btnHtml+'</td>';
+      tbody.appendChild(tr);
+      var btn=document.getElementById(btnId);
+      if(btn)(function(hid){btn.addEventListener('click',function(){openHiyariWriteById(hid);});})(h.id);
+    });
+  }
 }
 
 function clearHiyariFilter(){

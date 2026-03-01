@@ -282,6 +282,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
       </div>
       <button class="btn-add" onclick="addTicket()">▶ 計測開始</button>
       <span class="ticket-count-badge" id="ticketCountBadge">0件 計測中</span>
+
       <div class="tags-row">
         <label>タグ</label>
         <div id="newTagChips" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
@@ -536,13 +537,17 @@ function setupInputListeners(){
 }
 function confirmStore(){
   var code=document.getElementById('storeCodeInput').value.replace(/\D/g,'');
-  if(code.length!==5){var h=document.getElementById('setupHint');h.textContent='⚠ 5桁の数字を入力してください';h.className='setup-hint err';document.getElementById('storeCodeInput').focus();return;}
-  var secret=document.getElementById('secretInput').value.trim();
+  if(code.length!==5){
+    var h=document.getElementById('setupHint');
+    h.textContent='⚠ 5桁の数字を入力してください';h.className='setup-hint err';
+    document.getElementById('storeCodeInput').focus();return;
+  }
+  var secretEl=document.getElementById('secretInput');
+  var secret=secretEl?secretEl.value.trim():'';
   if(secret!==SECRET_WORD){
     var sh=document.getElementById('secretHint');
-    sh.textContent='⚠ 合言葉が違います';sh.className='setup-hint err';
-    document.getElementById('secretInput').value='';
-    document.getElementById('secretInput').focus();
+    if(sh){sh.textContent='⚠ 合言葉が違います';sh.className='setup-hint err';}
+    if(secretEl){secretEl.value='';secretEl.focus();}
     return;
   }
   SC=code;localStorage.setItem('rx_store_code',code);launchApp();
@@ -579,6 +584,7 @@ function setNextUnusedNum(){
   var n=1;
   while(used.has(String(n))&&n<999)n++;
   document.getElementById('ticketNumInput').value=n;
+
 }
 
 var numEditTargetId=null, swapTargetId=null, swapNewNum=null, swapConflictId=null;
@@ -789,7 +795,12 @@ function addTicket(){
   var numEl=document.getElementById('ticketNumInput'),num=numEl.value.trim();
   if(!num)return;
 
-  if(usedToday().has(num)){showToast('⚠ 番号 '+num+' は本日すでに使用済みです（キャンセル済みも含む）');return;}
+  // 使用済みなら次の使える番号に自動でスキップして開始
+  if(usedToday().has(num)){
+    setNextUnusedNum();
+    num=String(numEl.value);
+    if(usedToday().has(num)){showToast('⚠ 本日使用できる番号がありません');return;}
+  }
   var tags=newTags.length>0?newTags.slice():['normal'];
   var id='T'+Date.now(),now=Date.now();
   var t={id:id,ticketNum:num,status:'active',currentStep:0,stepTimes:{},pauseCount:0,giqiCount:0,giqiTotalMs:0,giqiStart:null,tags:tags,stepStart:now,pauseStart:null,pauseAccum:0,totalStart:now,dateStr:todayStr};

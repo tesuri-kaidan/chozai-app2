@@ -267,8 +267,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
     <button class="tab active" onclick="switchTab('measure')">⏱ 計測</button>
     <button class="tab" onclick="switchTab('today')">📅 本日</button>
     <button class="tab" onclick="switchTab('analysis')">📊 分析</button>
-    <button class="tab" onclick="switchTab('history')">📋 履歴</button>
-    <button class="tab" onclick="switchTab('hiyari')">⚠ ヒヤリ</button>
+    <button class="tab" onclick="switchTab('hiyari')" id="hiyariTab">⚠ ヒヤリ</button>
   </div>
 
   <div id="tab-measure" class="tab-content active">
@@ -303,6 +302,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
   </div>
 
   <div id="tab-analysis" class="tab-content">
+    <div style="text-align:right;margin-bottom:8px;">
+      <button onclick="toggleHistory()" id="historyToggleBtn" style="padding:7px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;color:var(--muted);">📋 履歴を表示</button>
+    </div>
     <div class="filter-bar">
       <label>日付</label><input type="date" class="filter-input" id="filterFrom"><label>〜</label><input type="date" class="filter-input" id="filterTo">
       <label>タグ</label><select class="filter-input" id="filterTag"><option value="">すべて</option></select>
@@ -325,23 +327,30 @@ header{display:flex;align-items:center;justify-content:space-between;padding:12p
     <div class="chart-container" id="giqiChart"><div class="empty-state" style="padding:24px"><div class="icon">📞</div><p>データがありません</p></div></div>
   </div>
 
-  <div id="tab-history" class="tab-content">
-    <div class="filter-bar">
-      <label>日付</label><input type="date" class="filter-input" id="histFilterFrom"><label>〜</label><input type="date" class="filter-input" id="histFilterTo">
-      <label>タグ</label><select class="filter-input" id="histFilterTag"><option value="">すべて</option></select>
-      <button class="btn-filter" onclick="updateHistory()">絞り込み</button>
-      <button class="btn-filter sec" onclick="clearHistFilter()">クリア</button>
-    </div>
-    <div class="history-controls">
-      <button class="btn-csv" onclick="exportCSV()">⬇ CSV出力</button>
-      <button class="btn-clear" onclick="clearHistory()">履歴をクリア</button>
-      <span style="margin-left:auto;font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace" id="histCount"></span>
-    </div>
-    <div class="table-wrap">
-      <table class="data-table" style="min-width:900px;">
-        <thead><tr><th>日付</th><th>時刻</th><th>番号</th><th>タグ</th><th>受付・入力</th><th>処方監査・ﾋﾟｯｷﾝｸﾞ</th><th>監査・確認</th><th>投薬・説明</th><th>合計</th><th>BN工程</th><th>疑義</th><th>疑義時間</th><th>ﾋﾔﾘ</th><th>ステータス</th></tr></thead>
-        <tbody id="historyBody"><tr><td colspan="14"><div class="empty-state" style="padding:24px"><div class="icon">📋</div><p>履歴がありません</p></div></td></tr></tbody>
-      </table>
+  <!-- 履歴はアコーディオンパネルとして計測タブ下部に配置 -->
+  <!-- 履歴パネル（分析タブ下部に常設） -->
+  <div id="tab-history-panel" style="display:none;margin-top:0;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:var(--shadow);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <span style="font-size:13px;font-weight:900;">📋 履歴</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input type="date" class="filter-input" id="histFilterFrom" style="font-size:11px;">
+          <span style="font-size:11px;color:var(--muted);">〜</span>
+          <input type="date" class="filter-input" id="histFilterTo" style="font-size:11px;">
+          <select class="filter-input" id="histFilterTag" style="font-size:11px;"><option value="">タグ: すべて</option></select>
+          <button class="btn-filter" onclick="updateHistory()" style="font-size:11px;padding:5px 10px;">絞込</button>
+          <button class="btn-filter sec" onclick="clearHistFilter()" style="font-size:11px;padding:5px 10px;">クリア</button>
+          <button class="btn-csv" onclick="exportCSV()" style="font-size:11px;padding:5px 10px;">⬇CSV</button>
+          <button class="btn-clear" onclick="clearHistory()" style="font-size:11px;padding:5px 10px;">削除</button>
+          <span style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;" id="histCount"></span>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-bottom:0;">
+        <table class="data-table" style="min-width:900px;">
+          <thead><tr><th>日付</th><th>時刻</th><th>番号</th><th>タグ</th><th>受付・入力</th><th>処方監査・ﾋﾟｯｷﾝｸﾞ</th><th>監査・確認</th><th>投薬・説明</th><th>合計</th><th>BN工程</th><th>疑義</th><th>疑義時間</th><th>ﾋﾔﾘ</th><th>ステータス</th></tr></thead>
+          <tbody id="historyBody"><tr><td colspan="14"><div class="empty-state" style="padding:24px"><div class="icon">📋</div><p>履歴がありません</p></div></td></tr></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -642,7 +651,26 @@ function startListening(){
     }
   },function(){syncDot('error');});
   unsub2=fRef('history').on('value',function(snap){var d=snap.val();histC=d?Object.values(d):[];updateHistory();updateAnalysis();populateTagFilters();});
-  unsub3=fRef('hiyari').on('value',function(snap){var d=snap.val();hiyC=d?Object.values(d):[];updateHiyariTab();renderAll();});
+  unsub3=fRef('hiyari').on('value',function(snap){
+    var d=snap.val();hiyC=d?Object.values(d):[];
+    // 未記載件数をチェックしてタブを目立たせる
+    var totalPending=hiyC.filter(function(h){return!h.written;}).length;
+    var hbt=document.getElementById('hiyariTab');
+    if(hbt){
+      if(totalPending>0){
+        hbt.textContent='⚠ ヒヤリ '+totalPending+'件';
+        if(!hbt.classList.contains('active')){
+          hbt.style.background='var(--hiyari-soft)';hbt.style.color='var(--hiyari)';
+          hbt.style.animation='pulse 1.5s ease-in-out infinite';
+        }
+      }else{
+        hbt.textContent='⚠ ヒヤリ';
+        hbt.style.background='';hbt.style.color='';hbt.style.animation='';
+      }
+    }
+    if(document.getElementById('tab-hiyari').classList.contains('active'))updateHiyariTab();
+    renderAll();
+  });
 }
 function stopListening(){
   if(unsub1)fRef('tickets').off('value',unsub1);
@@ -704,13 +732,12 @@ function updateCountBadge(){
   document.getElementById('ticketCountBadge').textContent=n+'件 計測中';
 }
 function usedToday(){
-  // active/paused/giqi/cancelled すべて同日の番号は使用済みとする
+  // 計測中（active/paused/giqi）の番号のみ使用済みとする
+  // 完了・キャンセルは再利用可能
   var s=new Set();
   Object.values(allT).forEach(function(t){
-    if(t.dateStr===todayStr&&['active','paused','giqi','cancelled'].indexOf(t.status)>=0)s.add(t.ticketNum);
+    if(t.dateStr===todayStr&&['active','paused','giqi'].indexOf(t.status)>=0)s.add(t.ticketNum);
   });
-  // historyにある本日完了分も含める
-  histC.forEach(function(h){if(h.dateISO===todayStr)s.add(h.ticketNum);});
   return s;
 }
 function addTicket(){
@@ -1244,6 +1271,22 @@ function updateHiyariTab(){
   document.getElementById('hStatTotal').textContent=filtered.length;
   document.getElementById('hStatPending').textContent=pending.length;
   document.getElementById('hStatPendingRate').textContent=filtered.length?Math.round(pending.length/filtered.length*100)+'%':'-';
+  // 未記載があればタブを目立たせる
+  var hiyariTabBtn=document.getElementById('hiyariTab');
+  var totalPending=hiyC.filter(function(h){return!h.written;}).length;
+  if(hiyariTabBtn){
+    if(totalPending>0){
+      hiyariTabBtn.textContent='⚠ ヒヤリ '+totalPending+'件';
+      hiyariTabBtn.style.background=hiyariTabBtn.classList.contains('active')?'var(--hiyari)':'var(--hiyari-soft)';
+      hiyariTabBtn.style.color=hiyariTabBtn.classList.contains('active')?'#fff':'var(--hiyari)';
+      hiyariTabBtn.style.borderColor='var(--hiyari)';
+      hiyariTabBtn.style.animation='pulse 1.5s ease-in-out infinite';
+    }else{
+      hiyariTabBtn.textContent='⚠ ヒヤリ';
+      hiyariTabBtn.style.background='';hiyariTabBtn.style.color='';
+      hiyariTabBtn.style.borderColor='';hiyariTabBtn.style.animation='';
+    }
+  }
   var sc={};PROC.forEach(function(p){sc[p.id]=0;});filtered.forEach(function(h){var p=PROC[h.step];if(p)sc[p.id]++;});
   var mx=Math.max.apply(null,Object.values(sc).concat([1]));
   document.getElementById('hiyariStepChart').innerHTML=PROC.map(function(p){return '<div class="bar-row"><div class="bar-label">'+p.icon+' '+p.name+'</div><div class="bar-wrap"><div class="bar-fill hiy" style="width:'+Math.max(sc[p.id]/mx*100,sc[p.id]>0?4:0)+'%">'+sc[p.id]+'件</div></div><span style="width:36px;flex-shrink:0"></span></div>';}).join('');
@@ -1268,14 +1311,30 @@ function clearHiyariFilter(){document.getElementById('hiyariFilterFrom').value='
 // UTILS
 function fmt(ms){var s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2800);}
+function toggleHistory(){
+  var panel=document.getElementById('tab-history-panel');
+  var btn=document.getElementById('historyToggleBtn');
+  var visible=panel.style.display!=='none';
+  panel.style.display=visible?'none':'block';
+  btn.textContent=visible?'📋 履歴を表示':'📋 履歴を閉じる';
+  btn.style.color=visible?'var(--muted)':'var(--accent)';
+  btn.style.borderColor=visible?'var(--border)':'var(--accent)';
+  if(!visible)updateHistory();
+}
+
 function switchTab(name){
-  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',['measure','today','analysis','history','hiyari'][i]===name);});
+  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.toggle('active',['measure','today','analysis','hiyari'][i]===name);});
   document.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active');});
-  document.getElementById('tab-'+name).classList.add('active');
+  var el=document.getElementById('tab-'+name);
+  if(el)el.classList.add('active');
   if(name==='today')updateTodayTab();
   if(name==='analysis')updateAnalysis();
-  if(name==='history')updateHistory();
-  if(name==='hiyari')updateHiyariTab();
+  if(name==='hiyari'){
+    updateHiyariTab();
+    // アクティブ時はアニメーション停止
+    var hbt=document.getElementById('hiyariTab');
+    if(hbt&&hbt.style.animation)hbt.style.animation='none';
+  }
 }
 function updateClock(){var n=new Date();document.getElementById('clockDisplay').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0');}
 
